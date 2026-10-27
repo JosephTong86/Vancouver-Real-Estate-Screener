@@ -1,0 +1,139 @@
+<title>Metro Vancouver Margin Map</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{color-scheme:light;--bg:#f2f4f1;--surface:#fff;--surface-2:#e9ece8;--ink:#16211d;--ink-2:#4b5954;--muted:#7f8b85;--line:#d6dbd6;--line-2:#c2c9c3;--accent:#1f5c4a;--accent-soft:#dcebe4;--accent-ink:#fff;--good:#1a7f4b;--bad:#b93a2d;--warn:#a86a05;--shadow:0 1px 2px rgba(20,30,26,.06),0 6px 20px rgba(20,30,26,.06)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#121716;--surface:#1a211e;--surface-2:#222b27;--ink:#eef1ee;--ink-2:#b4bdb8;--muted:#7f8a83;--line:#2c3630;--line-2:#3a463f;--accent:#5cb99a;--accent-soft:#1f3a31;--accent-ink:#0d1512;--good:#4fc47f;--bad:#ef7a6c;--warn:#e0a53a;--shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.35)}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#121716;--surface:#1a211e;--surface-2:#222b27;--ink:#eef1ee;--ink-2:#b4bdb8;--muted:#7f8a83;--line:#2c3630;--line-2:#3a463f;--accent:#5cb99a;--accent-soft:#1f3a31;--accent-ink:#0d1512;--good:#4fc47f;--bad:#ef7a6c;--warn:#e0a53a;--shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.35)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "IBM Plex Sans",system-ui,sans-serif;padding-inline:16px;padding-block:0 40px}
+h1,h2,h3{font-family:"Archivo","IBM Plex Sans",sans-serif;text-wrap:balance;margin:0}
+.wrap{max-width:1240px;margin:0 auto}
+.num{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+header{padding-block:26px 18px;border-bottom:1px solid var(--line)}
+header h1{font-size:26px;font-weight:700;letter-spacing:-.01em}
+header p{margin:6px 0 0;color:var(--ink-2);max-width:72ch}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.meta{color:var(--muted);font-size:12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;padding-block:16px}
+.chip{border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);border-radius:999px;padding:7px 14px;font-size:13px;cursor:pointer;text-align:left;line-height:1.3}
+.chip b{display:block;color:inherit;font-weight:600}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip:focus-visible,tr:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.grid{display:grid;grid-template-columns:minmax(300px,2fr) minmax(0,3fr);gap:16px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow)}
+.panel .hd{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.panel .hd h2{font-size:15px;font-weight:600}
+#chart{display:block;width:100%;height:auto;max-width:100%}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th.r,td.r{text-align:right}
+td{padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:top}
+td.city{white-space:normal;min-width:150px;font-weight:600}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--surface-2)}
+tbody tr[aria-selected="true"]{background:var(--accent-soft)}
+.pos{color:var(--good)}.neg{color:var(--bad)}
+.sub{display:block;color:var(--muted);font-size:11.5px;font-weight:400}
+#detail{margin-top:16px;padding:14px}
+#detail h3{font-size:15px;margin-bottom:6px}
+#detail p{margin:6px 0;color:var(--ink-2)}
+.kv{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:13px;margin-top:8px}
+.kv div:nth-child(odd){color:var(--ink-2)}
+.kv .tot{border-top:1px solid var(--line-2);padding-top:4px;margin-top:2px;font-weight:600}
+.verdict{margin:16px 0 0;padding:14px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 8px 8px 0;max-width:80ch;color:var(--ink-2)}
+.verdict strong{color:var(--ink)}
+details.notes{margin-top:20px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+details.notes summary{padding:12px 14px;cursor:pointer;font-weight:600;font-family:"Archivo",sans-serif}
+details.notes .inner{padding:0 14px 14px;color:var(--ink-2);max-width:84ch}
+details.notes p{margin:8px 0}
+details.notes a{color:var(--accent)}
+</style>
+<div class="wrap">
+<header>
+  <div class="eyebrow">Metro Vancouver · 11 municipalities · October 2026 inputs</div>
+  <h1>Metro Vancouver Margin Map</h1>
+  <p>The same three redevelopment prototypes costed in every municipality with its own 2026 land prices, achievable sale prices, construction costs and government charges. Margin is profit as a share of total cost; developers and lenders typically want 15% or more.</p>
+</header>
+<div class="chips" id="protos" role="tablist"></div>
+<div class="chips" id="sorts" style="padding-top:0"><span class="eyebrow" style="align-self:center;margin-right:4px">Rank by</span><button class="chip" data-s="margin" aria-pressed="true"><b>Margin on cost</b>profit ÷ total cost</button><button class="chip" data-s="roe"><b>Least capital, most profit</b>profit ÷ equity you put in</button><button class="chip" data-s="equity"><b>Lowest capital</b>equity needed, smallest first</button></div>
+<div class="grid">
+  <div>
+    <div class="panel">
+      <div class="hd"><h2 id="chart-title">Margin on cost</h2><span class="meta" id="chart-sub">15% target marked</span></div>
+      <svg id="chart" viewBox="0 0 520 420" role="img" aria-label="Margin on cost by municipality"></svg>
+    </div>
+    <div class="panel" id="detail" hidden></div>
+  </div>
+  <div class="panel">
+    <div class="hd"><h2>Where the money goes</h2><span class="meta" id="tbl-sub"></span></div>
+    <div class="tablewrap"><table id="tbl"><thead><tr>
+      <th>Municipality</th><th class="r">Sale $/sf</th><th class="r">Land $/bsf</th><th class="r">Fees / unit</th><th class="r">Cost to develop</th><th class="r">Equity needed</th><th class="r">Profit</th><th class="r">Margin</th><th class="r">Profit ÷ equity</th><th class="r">Max land ÷ price</th>
+    </tr></thead><tbody></tbody></table></div>
+  </div>
+</div>
+<div class="verdict" id="verdict"></div>
+<details class="notes"><summary>Inputs, sources and what to treat as an estimate</summary><div class="inner" id="notes"></div></details>
+</div>
+<script>
+/*__DATA__*/
+(function(){
+const $=s=>document.querySelector(s);
+const money=v=>v==null?'—':(v<0?'−':'')+'$'+(Math.abs(v)>=1e6?(Math.abs(v)/1e6).toLocaleString('en-CA',{maximumFractionDigits:Math.abs(v)>=1e7?0:1})+'M':(Math.abs(v)/1e3).toLocaleString('en-CA',{maximumFractionDigits:0})+'k');
+const pct=v=>v==null?'—':(v*100).toFixed(1)+'%';
+const int=v=>v==null?'—':Math.round(v).toLocaleString('en-CA');
+const PROTOS={A:{label:'Multiplex',sub:'4-6 units on a 557 m² lot, each city\'s SSMUH zoning'},B:{label:'6-storey wood-frame',sub:'strata, 2.5 FSR on a 1,400 m² assembly'},C:{label:'20-storey tower',sub:'strata, 5.0 FSR on a 2,000 m² transit site'}};
+const VERDICT={
+A:'<strong>Multiplex only pencils on Vancouver\'s west side, and barely.</strong> Everywhere else the standard lot costs $1.3–2.0M, the zoning allows less floor area than Vancouver\'s 1.0 FSR (Richmond 0.58, Langley 0.40, North Van District 0.50), and the suburbs\' per-unit DCC+ACC schedules are harsher on small projects than Vancouver\'s per-square-foot levy. Burnaby and North Vancouver City come closest. Surrey and Langley are the worst despite the cheapest land because $640/sf sale prices don\'t cover a $365–420/sf build plus $45–100k of fees per unit.',
+B:'<strong>Six-storey wood-frame is the prototype that works across the region in 2026</strong> — which is exactly where the starts are. North Vancouver City (strong prices, modest DCC, no ACC yet), Coquitlam\'s Burquitlam corridor and Langley\'s Willoughby lead on margin; Vancouver still clears 15% but needs twice the land price to do it. Richmond fails on its low-rise prices ($810/sf) and high fees; New Westminster is marginal. The land $/bsf inputs here are the softest numbers on the page — few 2026 comps exist — so treat the ranking as indicative and the "max land ÷ price" column as the number to negotiate against.',
+C:'<strong>Concrete towers are not viable anywhere in the region at 2026 prices except Vancouver\'s west side</strong>, and there only because tower land has already fallen to ~$100/bsf and Oakridge/Kitsilano achieve $1,400+/sf. This matches the market: zero concrete launches in Q1 2026, ~5,300 completed-unsold condos, Surrey City Centre towers in foreclosure. Burnaby\'s low fees and new outright 20–40 storey zoning do not rescue the math when achieved prices are ~$970/sf against a $530/sf build and a four-year carry. Rental towers with the DCL waiver and CMHC financing are the only concrete product moving, and they are valued on rents, not these sale prices.'};
+let proto='A', sel=null, sortBy='margin';
+const SORT={margin:{key:'margin',label:'Margin on cost',fmt:v=>(v*100).toFixed(0)+'%',target:0.15},roe:{key:'roe',label:'Profit per $ of equity',fmt:v=>(v*100).toFixed(0)+'%',target:0.25},equity:{key:'equity',label:'Equity needed',fmt:v=>'$'+(v/1e6).toFixed(1)+'M',target:null}};
+document.querySelectorAll('#sorts .chip').forEach(b=>b.addEventListener('click',()=>{sortBy=b.dataset.s;document.querySelectorAll('#sorts .chip').forEach(x=>x.setAttribute('aria-pressed',x===b));render();}));
+const chipsEl=$('#protos');
+for(const k of ['A','B','C']){const b=document.createElement('button');b.className='chip';b.setAttribute('role','tab');b.dataset.p=k;b.innerHTML=`<b>${PROTOS[k].label}</b>${PROTOS[k].sub}`;b.addEventListener('click',()=>{proto=k;sel=null;render();});chipsEl.appendChild(b);}
+function rowsFor(p){const k=SORT[sortBy].key;return DATA.rows.filter(r=>r.proto===p).sort((a,b)=>sortBy==='equity'?a[k]-b[k]:b[k]-a[k]);}
+const NS='http://www.w3.org/2000/svg';
+function el(n,a,t){const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);if(t!=null)e.textContent=t;return e;}
+function drawChart(rows){
+  const svg=$('#chart');svg.innerHTML='';
+  const W=520,L=170,R=50,T=14,rowH=Math.max(22,Math.floor((420-T-30)/Math.max(rows.length,1)));const H=T+rowH*rows.length+30;svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  const S=SORT[sortBy],key=S.key;const vals=rows.map(r=>r[key]);
+  const isMoney=sortBy==='equity';const lo=isMoney?0:Math.min(-0.05,...vals),hi=isMoney?Math.max(...vals)*1.05:Math.max(S.target||0.2,...vals);
+  const x=v=>L+(v-lo)/(hi-lo)*(W-L-R);
+  const ticks=isMoney?[0,5e6,1e7,2e7,3e7,4e7,6e7,8e7].filter(g=>g<=hi):[-0.5,-0.25,0,0.15,0.25,0.5,0.75,1].filter(g=>g>=lo&&g<=hi);
+  for(const g of ticks){const major=g===0||g===S.target;svg.appendChild(el('line',{x1:x(g),x2:x(g),y1:T,y2:H-26,stroke:major?'var(--line-2)':'var(--line)','stroke-dasharray':g===S.target?'3 3':'none','stroke-width':major?1.2:1}));svg.appendChild(el('text',{x:x(g),y:H-10,'text-anchor':'middle','font-size':10,fill:'var(--muted)','font-family':'IBM Plex Mono, monospace'},isMoney?'$'+(g/1e6)+'M':(g*100).toFixed(0)+'%'));}
+  $('#chart-title').textContent=S.label;$('#chart-sub').textContent=S.target?(S.target*100)+'% target marked':'smaller is better';
+  rows.forEach((r,i)=>{const y=T+i*rowH;const v=r[key];const bx0=x(Math.min(0,v)),bx1=x(Math.max(0,v));
+    const good=isMoney?'var(--accent)':(v>=S.target?'var(--accent)':v>=0?'var(--warn)':'var(--bad)');
+    const bar=el('rect',{x:bx0,y:y+4,width:Math.max(1,bx1-bx0),height:rowH-8,rx:3,fill:good,'fill-opacity':sel&&sel!==r.city?.45:.9});bar.style.cursor='pointer';bar.addEventListener('click',()=>{sel=r.city;render();});svg.appendChild(bar);
+    const lab=el('text',{x:L-8,y:y+rowH/2+4,'text-anchor':'end','font-size':11,fill:sel===r.city?'var(--ink)':'var(--ink-2)','font-family':'IBM Plex Sans, sans-serif','font-weight':sel===r.city?600:400},r.city);lab.style.cursor='pointer';lab.addEventListener('click',()=>{sel=r.city;render();});svg.appendChild(lab);
+    svg.appendChild(el('text',{x:v>=0?bx1+5:x(0)+5,y:y+rowH/2+4,'text-anchor':'start','font-size':10.5,fill:'var(--ink-2)','font-family':'IBM Plex Mono, monospace'},S.fmt(v)));
+  });
+}
+function render(){
+  document.querySelectorAll('#protos .chip').forEach(b=>b.setAttribute('aria-pressed',b.dataset.p===proto));
+  const rows=rowsFor(proto);drawChart(rows);
+  $('#tbl-sub').textContent=PROTOS[proto].label+' · '+PROTOS[proto].sub;
+  const tb=$('#tbl tbody');tb.innerHTML='';
+  rows.forEach(r=>{const tr=document.createElement('tr');tr.tabIndex=0;tr.setAttribute('aria-selected',sel===r.city);
+    tr.innerHTML=`<td class="city">${r.city}<span class="sub">${int(r.units)} units · ${int(r.gfa)} sf</span></td><td class="r num">$${int(r.price)}</td><td class="r num">$${int(r.land_per_bsf)}</td><td class="r num">$${int(r.fees_per_unit)}</td><td class="r num">${money(r.cost)}<span class="sub">hard $${int(r.hard_psf)}/sf</span></td><td class="r num">${money(r.equity)}</td><td class="r num ${r.profit>=0?'pos':'neg'}">${money(r.profit)}</td><td class="r num ${r.margin>=0.15?'pos':r.margin>=0?'':'neg'}">${pct(r.margin)}</td><td class="r num ${r.roe>=0.25?'pos':r.roe>=0?'':'neg'}">${pct(r.roe)}</td><td class="r num">${r.rlv_vs_land==null?'—':r.rlv_vs_land.toFixed(2)+'×'}</td>`;
+    tr.addEventListener('click',()=>{sel=r.city;render();});tr.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();sel=r.city;render();}});tb.appendChild(tr);});
+  $('#verdict').innerHTML=VERDICT[proto];
+  const d=$('#detail');
+  if(!sel){d.hidden=true;return;}
+  const r=rows.find(x=>x.city===sel);const c=DATA.cities[sel];d.hidden=false;
+  const parts=[['Land (incl. PTT, closing, carry)',r.acq],['Hard construction',r.hard],['Soft costs & financing',r.soft],['DCC, ACC/CAC, Metro, TransLink, school',r.fees]];
+  d.innerHTML=`<h3>${sel} · ${PROTOS[proto].label}</h3><p><strong>Zoning in 2026:</strong> ${c.zoning}</p><p>${c.note}</p>
+  <div class="kv"><div>Revenue · ${int(r.gfa*{A:.9,B:.85,C:.8}[proto])} sf × $${int(r.price)}</div><div class="num">${money(r.revenue)}</div>${parts.map(p=>`<div>${p[0]}</div><div class="num">−${money(p[1])}</div>`).join('')}<div class="tot">Total cost to develop</div><div class="num tot">${money(r.cost)}</div><div class="tot">Profit · margin on cost</div><div class="num tot ${r.profit>=0?'pos':'neg'}">${money(r.profit)} · ${pct(r.margin)}</div><div>Equity needed (land + 25% of build, lender funds the rest)</div><div class="num">${money(r.equity)}</div><div>Profit per $ of equity</div><div class="num ${r.roe>=0?'pos':'neg'}">${pct(r.roe)}</div><div>Max land price for 15%</div><div class="num">${money(r.rlv)} <span class="sub">vs ${money(r.land)} assumed</span></div></div>`;
+}
+$('#notes').innerHTML=`
+<p><strong>Common assumptions.</strong> Vancouver all-in hard costs of $420/sf (multiplex), $360 (6-storey wood-frame) and $560 (concrete tower), scaled ×0.95 for Burnaby, Richmond, the North Shore, Tri-Cities and New West and ×0.87 for Surrey and Langley (BTY 2026 puts Fraser Valley 10–30% below Vancouver). Soft costs 22/24/28% of hard; land carried at 6.5% for 18/30/48 months; property transfer tax and 1% closing on land; $60k demolition; efficiency 90/85/80%; concrete presales cleared at 92% of asking. Metro Vancouver's regional DCC at the post-July 24 2026 rollback rates by sewerage area, TransLink's 2026 DCC, school-site charges where levied, and $6k/unit of permit costs are added to every city's own charges.</p>
+<p><strong>Per-city inputs.</strong> Lot price for the multiplex prototype is the September 2026 HPI benchmark detached price (GVR / FVREB). Sale prices are medians of September 2026 presale asking prices from <a href="https://vancouverdwelling.ca/presales/">Vancouver Dwelling</a> and builder reports, trimmed to achievable. Land per buildable foot for the wood-frame and tower prototypes comes from 2025–26 comps and listings (Goodman Report, Altus Q2 2026, Rain City, Western Investor) and is the least reliable input on the page: few sites traded in 2026 and most figures are asking. Government charges are from each municipality's current DCC and ACC bylaws (Vancouver DCL bulletin Dec 2025 and ACC Sept 2026; Burnaby ACC Jul 2026; Surrey ACC Jun 2026 and proposed 2026 DCC; Coquitlam DCC/ACC 2025; New Westminster DCC 2026 with ACC estimated; Richmond DCC 2023 and proposed ACC; City of North Vancouver DCC 2025 and Lonsdale CAC $110/sf on bonus floor area; District of North Vancouver DCC/ACC 2025; Port Moody ACC Jul 2026 with multi-residential DCC estimated at $20/sf; Township of Langley DCC Nov 2025 and ACC Mar 2026) and the CHBA 2024 benchmarking study.</p>
+<p><strong>Cost to develop and equity.</strong> "Cost to develop" is everything: land with transfer tax, closing and carry, hard and soft costs, and all government charges. "Equity needed" assumes a conventional construction loan at 75% loan-to-cost once presales are in place, so the developer funds the whole land purchase plus 25% of construction, soft costs and fees; it ignores mezzanine debt, vendor take-backs and joint-venture land contributions, any of which can cut the cheque substantially. "Profit ÷ equity" is the undiscounted return on that cheque over the whole project (18 months to 4 years depending on prototype), not an annual rate.</p>
+<p><strong>How to read it.</strong> Each bar is one prototype on one representative site; real sites vary enormously and a different lot, FSR or finish level moves any city several points. The useful comparisons are the relative ones: which cities\' fee schedules punish small projects, where land has repriced to the point that mid-rise clears 15%, and why concrete is frozen region-wide. The three-prototype engine (<code>gva_compare.py</code>) and every number above ship with the Vancouver screener so they can be edited and re-run.</p>
+<p class="meta">Built ${DATA.generated}. Metro Vancouver DCC: metrovancouver.org; CHBA Municipal Benchmarking Study 2024; GVR and FVREB September 2026 statistics; BTY and Altus 2026 cost guides; municipal bylaws as cited. All figures CAD.</p>`;
+render();
+})();
+</script>

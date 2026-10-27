@@ -1,0 +1,341 @@
+<title>Vancouver Redevelopment Screener</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f2f4f1; --surface:#ffffff; --surface-2:#e9ece8; --ink:#16211d; --ink-2:#4b5954; --muted:#7f8b85; --line:#d6dbd6; --line-2:#c2c9c3;
+  --accent:#1f5c4a; --accent-soft:#dcebe4; --accent-ink:#ffffff;
+  --good:#1a7f4b; --warn:#a86a05; --bad:#b93a2d;
+  --g:#2a78d6; --w:#eb6834; --c:#1baf7a;
+  --shadow:0 1px 2px rgba(20,30,26,.06),0 6px 20px rgba(20,30,26,.06);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#121716; --surface:#1a211e; --surface-2:#222b27; --ink:#eef1ee; --ink-2:#b4bdb8; --muted:#7f8a83; --line:#2c3630; --line-2:#3a463f;
+    --accent:#5cb99a; --accent-soft:#1f3a31; --accent-ink:#0d1512;
+    --good:#4fc47f; --warn:#e0a53a; --bad:#ef7a6c;
+    --g:#3987e5; --w:#d95926; --c:#199e70;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#121716; --surface:#1a211e; --surface-2:#222b27; --ink:#eef1ee; --ink-2:#b4bdb8; --muted:#7f8a83; --line:#2c3630; --line-2:#3a463f;
+  --accent:#5cb99a; --accent-soft:#1f3a31; --accent-ink:#0d1512;
+  --good:#4fc47f; --warn:#e0a53a; --bad:#ef7a6c;
+  --g:#3987e5; --w:#d95926; --c:#199e70;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "IBM Plex Sans",system-ui,-apple-system,Segoe UI,sans-serif;padding-inline:16px;padding-block:0 40px}
+h1,h2,h3{font-family:"Archivo","IBM Plex Sans",system-ui,sans-serif;text-wrap:balance;margin:0}
+.wrap{max-width:1440px;margin:0 auto}
+.num{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;padding-block:26px 18px;border-bottom:1px solid var(--line)}
+header h1{font-size:26px;font-weight:700;letter-spacing:-.01em}
+header p{margin:6px 0 0;color:var(--ink-2);max-width:68ch}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.meta{color:var(--muted);font-size:12px}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 14px;padding-block:16px;border-bottom:1px solid var(--line)}
+.ctl label{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:4px}
+.ctl select,.ctl input[type=text],.ctl input[type=number]{width:100%;height:34px;padding:0 8px;border:1px solid var(--line-2);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit}
+.ctl input[type=range]{width:100%;accent-color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;user-select:none}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,tr:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;padding-block:16px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.kpi .v{font-family:"Archivo",sans-serif;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}
+.kpi .s{color:var(--muted);font-size:12px}
+.main{display:grid;grid-template-columns:minmax(300px,5fr) minmax(0,7fr);gap:16px;align-items:start}
+@media (max-width:960px){.main{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow)}
+.panel .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.panel .hd h2{font-size:15px;font-weight:600}
+#map{display:block;width:100%;height:auto;aspect-ratio:1.18;max-width:100%}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;padding:10px 14px;font-size:12px;color:var(--ink-2);border-top:1px solid var(--line)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{position:sticky;top:0;background:var(--surface);text-align:left;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer}
+th.r,td.r{text-align:right}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap}
+td.addr{white-space:normal;min-width:170px}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--surface-2)}
+tbody tr[aria-selected="true"]{background:var(--accent-soft)}
+.rank{color:var(--muted)}
+.sub{display:block;color:var(--muted);font-size:11.5px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.pos{color:var(--good)} .neg{color:var(--bad)}
+.tag{display:inline-block;font-size:10.5px;padding:1px 6px;border-radius:4px;background:var(--surface-2);color:var(--ink-2);margin-left:6px;vertical-align:1px}
+.tag.listed{background:var(--accent-soft);color:var(--accent)}
+.more{display:flex;justify-content:center;padding:12px}
+button.btn{font:inherit;font-size:13px;padding:7px 14px;border-radius:6px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);cursor:pointer}
+button.btn:hover{background:var(--surface-2)}
+#detail{margin-top:16px}
+#detail .body{padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:600px){#detail .body{grid-template-columns:1fr}}
+.kv{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:13px}
+.kv div:nth-child(odd){color:var(--ink-2)}
+.kv .tot{border-top:1px solid var(--line-2);padding-top:4px;margin-top:2px;font-weight:600}
+.links a{color:var(--accent);margin-right:14px;font-weight:500}
+.bar{height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden;display:flex;margin:8px 0 4px}
+.bar span{height:100%}
+.empty{padding:24px;color:var(--muted);text-align:center}
+details.notes{margin-top:20px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+details.notes summary{padding:12px 14px;cursor:pointer;font-weight:600;font-family:"Archivo",sans-serif}
+details.notes .inner{padding:0 14px 14px;color:var(--ink-2);max-width:80ch}
+details.notes p{margin:8px 0}
+details.notes table{font-size:12.5px;width:auto}
+details.notes td,details.notes th{padding:4px 10px;cursor:default;position:static}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;padding:6px 9px;border-radius:6px;box-shadow:var(--shadow);z-index:9;max-width:260px}
+@media (prefers-reduced-motion:no-preference){tbody tr,.chip{transition:background .12s}}
+</style>
+
+<div class="wrap">
+<header>
+  <div>
+    <div class="eyebrow">City of Vancouver · fee-simple parcels · outright zoning</div>
+    <h1>Vancouver Redevelopment Screener</h1>
+    <p>Every parcel scored on what its <em>current</em> zoning already permits: buildable floor area × achievable 2026 sale price, less construction, levies and an acquisition at assessed value. Ranked by modelled profit.</p>
+  </div>
+  <div class="meta" id="meta"></div>
+</header>
+
+<section class="controls" aria-label="Filters">
+  <div class="ctl"><label for="f-q">Search address / zone</label><input type="text" id="f-q" placeholder="e.g. Broadway, C-2A, Kitsilano"></div>
+  <div class="ctl"><label for="f-budget">Max assessed value</label>
+    <select id="f-budget"><option value="">Any budget</option><option value="2000000">≤ $2M</option><option value="3000000">≤ $3M</option><option value="5000000">≤ $5M</option><option value="10000000">≤ $10M</option><option value="25000000">≤ $25M</option></select></div>
+  <div class="ctl"><label for="f-area">Local area</label><select id="f-area"><option value="">All 22 areas</option></select></div>
+  <div class="ctl"><label for="f-min">Site size m² (min – max)</label>
+    <div style="display:flex;gap:6px"><input type="number" id="f-min" placeholder="min" min="0" step="50"><input type="number" id="f-max" placeholder="max" min="0" step="50"></div></div>
+  <div class="ctl"><label for="f-margin">Min margin on cost: <span id="f-margin-v" class="num">15%</span></label><input type="range" id="f-margin" min="0" max="60" step="5" value="15"></div>
+  <div class="ctl"><label for="f-sort">Rank by</label>
+    <select id="f-sort"><option value="profit">Profit ($)</option><option value="margin">Margin (% on cost)</option><option value="rlvx">Max land price ÷ assessed</option><option value="best">Best of outright / TOA rezoning</option></select></div>
+  <div class="ctl" style="grid-column:1/-1"><label>Zoning family</label>
+    <div class="chips" id="f-zones">
+      <button class="chip" data-z="R1" aria-pressed="true">R1-1 multiplex</button>
+      <button class="chip" data-z="RT" aria-pressed="true">RT duplex / infill</button>
+      <button class="chip" data-z="RM" aria-pressed="true">RM apartment</button>
+      <button class="chip" data-z="R345" aria-pressed="true">R3 / R4 / R5 Broadway &amp; Cambie pre-zoned</button>
+      <button class="chip" data-z="C" aria-pressed="true">C-2 / C-3A mixed-use</button>
+      <button class="chip" data-z="RR" aria-pressed="true">RR secured rental</button>
+      <span style="width:12px"></span>
+      <button class="chip" data-g="G" aria-pressed="true"><i class="dot" style="background:var(--g)"></i>Ground-oriented</button>
+      <button class="chip" data-g="W" aria-pressed="true"><i class="dot" style="background:var(--w)"></i>Wood-frame apt</button>
+      <button class="chip" data-g="C" aria-pressed="true"><i class="dot" style="background:var(--c)"></i>Concrete</button>
+      <button class="chip" id="f-listed" aria-pressed="false">Listed for sale only (priced at asking)</button>
+    </div></div>
+</section>
+
+<section class="kpis" id="kpis"></section>
+
+<div class="main">
+  <div>
+    <div class="panel">
+      <div class="hd"><h2>Where the top 100 sit</h2><span class="meta">dot size = modelled profit</span></div>
+      <svg id="map" viewBox="0 0 600 508" role="img" aria-label="Map of Vancouver local areas with the ranked sites"></svg>
+      <div class="legend"><span><i style="background:var(--g)"></i>Ground-oriented (multiplex, townhouse)</span><span><i style="background:var(--w)"></i>Wood-frame apartment (4–6 st)</span><span><i style="background:var(--c)"></i>Concrete mid-rise / tower</span><span><i style="background:var(--muted);border-radius:1px"></i>SkyTrain station</span></div>
+    </div>
+    <div class="panel" id="detail" hidden></div>
+  </div>
+  <div class="panel">
+    <div class="hd"><h2 id="tbl-title">Top 100</h2><span class="meta" id="tbl-sub"></span></div>
+    <div class="tablewrap"><table id="tbl">
+      <thead><tr>
+        <th>#</th><th data-k="address">Site</th><th data-k="zone">Zone · build</th><th class="r" data-k="site_m2">Site m²</th><th class="r" data-k="assessed" id="th-price">Assessed</th><th class="r" data-k="gfa">Buildable sf</th><th class="r" data-k="profit">Profit</th><th class="r" data-k="margin">Margin</th><th class="r" data-k="rlv">Max land price</th>
+      </tr></thead><tbody></tbody></table></div>
+    <div class="more"><button class="btn" id="more" hidden>Show next 100</button></div>
+  </div>
+</div>
+
+<details class="notes">
+  <summary>How the numbers are built, and what to double-check</summary>
+  <div class="inner" id="notes"></div>
+</details>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+/*__DATA__*/
+(function(){
+const C = {}; DATA.cols.forEach((c,i)=>C[c]=i);
+const rows = DATA.rows.map(r=>{const o={}; DATA.cols.forEach((c,i)=>o[c]=r[i]); return o;});
+const $ = s=>document.querySelector(s);
+const fmtM = v => v==null? '—' : (Math.abs(v)>=1e6? (v/1e6).toLocaleString('en-CA',{maximumFractionDigits:Math.abs(v)>=1e7?0:1})+'M' : (v/1e3).toLocaleString('en-CA',{maximumFractionDigits:0})+'k');
+const money = v => v==null? '—' : (v<0?'−':'')+'$'+fmtM(Math.abs(v));
+const pct = v => v==null? '—' : (v*100).toFixed(0)+'%';
+const int = v => v==null? '—' : Math.round(v).toLocaleString('en-CA');
+const zfam = z => z.startsWith('R1-')?'R1': z.startsWith('RT')?'RT': z.startsWith('RM')?'RM': /^R[345]-/.test(z)?'R345': z.startsWith('C-')?'C': z.startsWith('RR')?'RR':'other';
+const TYPO = DATA.assumptions.typologies;
+const GCOL = {G:'var(--g)',W:'var(--w)',C:'var(--c)'};
+
+// ---------- state
+const st = {q:'',budget:'',area:'',min:'',max:'',margin:0.15,sort:'profit',zones:new Set(['R1','RT','RM','R345','C','RR']),groups:new Set(['G','W','C']),listed:false,shown:100,sel:null};
+try{const s=JSON.parse(localStorage.getItem('vrs-filters')||'null'); if(s){Object.assign(st,s,{zones:new Set(s.zones),groups:new Set(s.groups),shown:100,sel:null});}}catch(e){}
+function save(){try{localStorage.setItem('vrs-filters',JSON.stringify({...st,zones:[...st.zones],groups:[...st.groups]}));}catch(e){}}
+
+// populate area select
+[...new Set(rows.map(r=>r.area).filter(Boolean))].sort().forEach(a=>{const o=document.createElement('option');o.value=a;o.textContent=a;$('#f-area').appendChild(o);});
+$('#f-q').value=st.q; $('#f-budget').value=st.budget; $('#f-area').value=st.area; $('#f-min').value=st.min; $('#f-max').value=st.max; $('#f-margin').value=st.margin*100; $('#f-sort').value=st.sort;
+document.querySelectorAll('#f-zones .chip[data-z]').forEach(b=>b.setAttribute('aria-pressed',st.zones.has(b.dataset.z)));
+document.querySelectorAll('#f-zones .chip[data-g]').forEach(b=>b.setAttribute('aria-pressed',st.groups.has(b.dataset.g)));
+$('#f-listed').setAttribute('aria-pressed',st.listed);
+$('#meta').innerHTML = `Assessment roll 2026 · ${int(DATA.summary.parcels_total)} parcels screened · built ${DATA.generated}`;
+
+// ---------- filtering + ranking
+function score(r){ if(st.listed && r.listed && r.ask_profit!=null){ return st.sort==='margin'? r.ask_margin : r.ask_profit; } if(st.sort==='margin') return r.margin; if(st.sort==='rlvx') return r.rlv&&r.assessed? r.rlv/r.assessed : -1; if(st.sort==='best') return Math.max(r.profit, r.toa_profit==null?-Infinity:r.toa_profit); return r.profit; }
+function filtered(){
+  const q=st.q.trim().toLowerCase();
+  return rows.filter(r=>
+    (!q || (r.address+' '+r.zone+' '+r.area+' '+(r.postal||'')).toLowerCase().includes(q)) &&
+    (!st.budget || r.assessed<=+st.budget) && (!st.area || r.area===st.area) &&
+    (st.min==='' || r.site_m2>=+st.min) && (st.max==='' || r.site_m2<=+st.max) &&
+    (st.sort==='best' ? Math.max(r.margin, r.toa_margin==null?-1:r.toa_margin)>=st.margin : (st.listed&&r.listed&&r.ask_margin!=null? r.ask_margin : r.margin)>=st.margin) &&
+    st.zones.has(zfam(r.zone)) && st.groups.has(r.group) && (!st.listed || r.listed)
+  ).sort((a,b)=>score(b)-score(a));
+}
+let cur=[];
+function render(){
+  cur=filtered(); save();
+  const top=cur.slice(0,st.shown);
+  // KPIs
+  const med=a=>{if(!a.length)return null;const s=[...a].sort((x,y)=>x-y);return s[Math.floor(s.length/2)];};
+  const t100=cur.slice(0,100);
+  const listedN=t100.filter(r=>r.listed).length;
+  $('#kpis').innerHTML = [
+    ['Sites passing filters', int(cur.length), `of ${int(rows.length)} with a non-negative margin`],
+    ['Median profit, top 100', money(med(t100.map(r=>r.profit))), 'at assessed value ×'+DATA.assumptions.market_over_assessed],
+    ['Median margin, top 100', pct(med(t100.map(r=>r.margin))), `target ≥ ${pct(DATA.assumptions.target_margin)} on cost`],
+    ['Median assessed, top 100', money(med(t100.map(r=>r.assessed))), 'land + improvements, 2026 roll'],
+    ['Listed for sale', int(cur.filter(r=>r.listed).length), listedN? int(listedN)+' in this top 100 · REW.ca, '+DATA.generated : 'none matched in this view'],
+  ].map(([l,v,s])=>`<div class="kpi"><div class="eyebrow">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
+  // table
+  const tb=$('#tbl tbody'); tb.innerHTML='';
+  if(!top.length){tb.innerHTML=`<tr><td colspan="9" class="empty">Nothing clears these filters — lower the minimum margin or widen the zoning family.</td></tr>`;}
+  top.forEach((r,i)=>{
+    const tr=document.createElement('tr'); tr.tabIndex=0; tr.dataset.i=i; tr.setAttribute('aria-selected', st.sel===r);
+    const basis = st.sort==='best' && r.toa_profit!=null && r.toa_profit>r.profit;
+    const atAsk = st.listed && r.listed && r.ask_profit!=null;
+    const p = basis? r.toa_profit : atAsk? r.ask_profit : r.profit, m = basis? r.toa_margin : atAsk? r.ask_margin : r.margin;
+    tr.innerHTML = `<td class="rank num">${i+1}</td>
+      <td class="addr"><strong>${r.address}</strong>${r.listed?'<span class="tag listed">Listed</span>':''}${r.stacked>1?'<span class="tag">'+r.stacked+' parcels</span>':''}<span class="sub">${r.area}${r.postal?' · '+r.postal:''}${r.year_built?' · built '+r.year_built:''}</span></td>
+      <td><span class="dot" style="background:${GCOL[r.group]}"></span>${r.zone}<span class="sub">${basis? r.toa_tier+' · '+r.toa_fsr.toFixed(1)+' FSR rental' : r.fsr.toFixed(2)+' FSR · '+TYPO[r.typology].label}</span></td>
+      <td class="r num">${int(r.site_m2)}</td>
+      <td class="r num">${atAsk? money(r.list_price)+'<span class="sub">asking · assessed '+money(r.assessed)+'</span>' : money(r.assessed)}</td>
+      <td class="r num">${int(basis? r.site_m2*10.7639*r.toa_fsr : r.gfa)}</td>
+      <td class="r num ${p>=0?'pos':'neg'}">${money(p)}</td>
+      <td class="r num ${m>=0?'pos':'neg'}">${pct(m)}</td>
+      <td class="r num">${money(r.rlv)}<span class="sub">${r.rlv&&r.assessed? (r.rlv/r.assessed).toFixed(2)+'× assessed':''}</span></td>`;
+    tr.addEventListener('click',()=>select(r)); tr.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(r);}});
+    tb.appendChild(tr);
+  });
+  $('#tbl-title').textContent = `Top ${Math.min(st.shown,cur.length)}`+(st.listed?' listed for sale':'');
+  $('#th-price').textContent = st.listed? 'Asking' : 'Assessed';
+  $('#tbl-sub').textContent = st.sort==='profit'?'ranked by modelled profit': st.sort==='margin'?'ranked by margin on cost': st.sort==='rlvx'?'ranked by max land price ÷ assessed value':'best of outright zoning or TOA rezoning';
+  $('#more').hidden = cur.length<=st.shown;
+  drawMap(top);
+}
+
+// ---------- map
+const svg=$('#map'); const W=600,H=508;
+const allLon=DATA.areas.flatMap(a=>a.rings.flat().map(p=>p[0])), allLat=DATA.areas.flatMap(a=>a.rings.flat().map(p=>p[1]));
+const lon0=Math.min(...allLon), lon1=Math.max(...allLon), lat0=Math.min(...allLat), lat1=Math.max(...allLat);
+const k=Math.cos(49.25*Math.PI/180); const sx=(W-20)/((lon1-lon0)*k), sy=(H-20)/(lat1-lat0); const s=Math.min(sx,sy);
+const X=lon=>10+(lon-lon0)*k*s, Y=lat=>H-10-(lat-lat0)*s;
+const NS='http://www.w3.org/2000/svg';
+function el(n,a){const e=document.createElementNS(NS,n);for(const q in a)e.setAttribute(q,a[q]);return e;}
+const base=el('g',{}); svg.appendChild(base);
+DATA.areas.forEach(a=>{a.rings.forEach(r=>{const d=r.map((p,i)=>(i?'L':'M')+X(p[0]).toFixed(1)+' '+Y(p[1]).toFixed(1)).join('')+'Z';const p=el('path',{d,fill:'var(--surface-2)',stroke:'var(--bg)','stroke-width':1.2});p.appendChild(Object.assign(document.createElementNS(NS,'title'),{textContent:a.name}));base.appendChild(p);});
+  const pts=a.rings[0]; const cx=pts.reduce((q,p)=>q+X(p[0]),0)/pts.length, cy=pts.reduce((q,p)=>q+Y(p[1]),0)/pts.length;
+  if(a.rings[0].length>8){const t=el('text',{x:cx,y:cy,'text-anchor':'middle','font-size':8,fill:'var(--muted)','font-family':'IBM Plex Sans, sans-serif'});t.textContent=a.name.replace('Kensington-Cedar Cottage','Kensington-C.C.').replace('Renfrew-Collingwood','Renfrew-Coll.').replace('Dunbar-Southlands','Dunbar').replace('Grandview-Woodland','Grandview').replace('Victoria-Fraserview','Vic-Fraserview');base.appendChild(t);}});
+DATA.stations.forEach(z=>base.appendChild(el('rect',{x:X(z.lon)-2.5,y:Y(z.lat)-2.5,width:5,height:5,fill:'var(--muted)',rx:1})));
+const dots=el('g',{}); svg.appendChild(dots);
+const tip=$('#tip');
+function drawMap(top){
+  dots.innerHTML='';
+  const maxP=Math.max(1,...top.map(r=>Math.max(r.profit,r.toa_profit||0)));
+  [...top].reverse().forEach((r,ri)=>{ if(r.lat==null) return;
+    const i=top.length-1-ri; const p=Math.max(r.profit, st.sort==='best'&&r.toa_profit!=null?r.toa_profit:-Infinity);
+    const rad=3+9*Math.sqrt(Math.max(0,p)/maxP);
+    const c=el('circle',{cx:X(r.lon),cy:Y(r.lat),r:rad,fill:GCOL[r.group],'fill-opacity':.78,stroke:st.sel===r?'var(--ink)':'var(--surface)','stroke-width':st.sel===r?2.5:1.2,tabindex:-1});
+    c.style.cursor='pointer';
+    c.addEventListener('mousemove',e=>{tip.hidden=false;tip.innerHTML=`<strong>#${i+1} ${r.address}</strong><br>${r.zone} · ${r.fsr.toFixed(2)} FSR · ${money(r.profit)} (${pct(r.margin)})`;tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY+12)+'px';});
+    c.addEventListener('mouseleave',()=>tip.hidden=true);
+    c.addEventListener('click',()=>select(r));
+    dots.appendChild(c);
+  });
+}
+
+// ---------- detail
+function select(r){
+  st.sel=r; const d=$('#detail'); d.hidden=false;
+  const parts=[['Acquisition (assessed ×'+DATA.assumptions.market_over_assessed+', PTT, demo, carry)',r.acquisition],['Hard construction',r.hard],['Soft costs',r.soft],['Levies, DCCs & inclusionary',r.levies]];
+  const cols=['var(--ink-2)','var(--line-2)','var(--muted)','var(--warn)'];
+  const gm=`https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lon}`;
+  const bca=`https://www.bcassessment.ca/Property/Search/GetByAddress?addr=${encodeURIComponent(r.address+' Vancouver')}`;
+  d.innerHTML=`<div class="hd"><h2>${r.address}<span class="sub" style="font-family:'IBM Plex Sans';font-weight:400">${r.area} · ${r.zone} · PID ${r.pid}${r.stacked>1?' (+'+(r.stacked-1)+' stacked parcels)':''}</span></h2><button class="btn" id="close">Close</button></div>
+  <div class="body">
+    <div>
+      <div class="eyebrow">Development option under current zoning</div>
+      <div class="kv" style="margin-top:6px">
+        <div>Site</div><div class="num">${int(r.site_m2)} m² (${int(r.site_m2*10.7639)} sf)</div>
+        <div>Permitted</div><div class="num">${r.fsr.toFixed(2)} FSR · ${TYPO[r.typology].label}${r.storeys?' · '+r.storeys+' st':''}</div>
+        <div>Buildable / saleable</div><div class="num">${int(r.gfa)} / ${int(r.gfa*TYPO[r.typology].eff)} sf · ~${r.units} units</div>
+        <div>Assessed 2026</div><div class="num">${money(r.assessed)} <span class="sub">land ${money(r.land)} · bldg ${money(r.improvement)}${r.year_built?' ('+r.year_built+')':''}</span></div>
+        <div>Land cost per buildable sf</div><div class="num">$${int(r.land_psf_buildable)}</div>
+        <div>Nearest SkyTrain</div><div class="num">${r.station} · ${int(r.station_m)} m</div>
+      </div>
+      ${r.note?`<p class="meta" style="margin:10px 0 0">${r.note}</p>`:''}
+      ${r.toa_tier?`<p style="margin:10px 0 0;padding:8px 10px;border-radius:6px;background:var(--surface-2);font-size:12.5px"><strong>TOA rezoning upside:</strong> ${r.toa_tier}, ${r.toa_fsr.toFixed(1)} FSR secured rental → modelled profit ${money(r.toa_profit)} (${pct(r.toa_margin)}). Requires a rezoning application; not outright.</p>`:''}
+      ${r.existing_apt?`<p class="meta">Flagged: likely an existing apartment building — rental-replacement and tenant-relocation policies would apply.</p>`:''}
+      <p class="links" style="margin:12px 0 0"><a href="${gm}" target="_blank" rel="noopener">Open in Google Maps</a><a href="${bca}" target="_blank" rel="noopener">BC Assessment</a>${r.listed&&r.listing_url?`<a href="${r.listing_url}" target="_blank" rel="noopener">Listing${r.list_price?' · '+money(r.list_price):''}</a>`:''}</p>
+    </div>
+    <div>
+      <div class="eyebrow">Pro forma (strata sell-out)</div>
+      <div class="bar" title="cost mix">${parts.map((p,i)=>`<span style="width:${(100*p[1]/r.cost).toFixed(1)}%;background:${cols[i]}"></span>`).join('')}</div>
+      <div class="kv">
+        <div>Revenue · ${int(r.gfa*TYPO[r.typology].eff)} sf × $${int(r.price_psf)}/sf</div><div class="num">${money(r.revenue)}</div>
+        ${parts.map(p=>`<div>${p[0]}</div><div class="num">−${money(p[1])}</div>`).join('')}
+        <div class="tot">Total cost</div><div class="num tot">${money(r.cost)}</div>
+        <div class="tot">Profit · margin on cost</div><div class="num tot ${r.profit>=0?'pos':'neg'}">${money(r.profit)} · ${pct(r.margin)}</div>
+        ${r.listed&&r.ask_profit!=null?`<div class="tot">At asking price ${money(r.list_price)}</div><div class="num tot ${r.ask_profit>=0?'pos':'neg'}">${money(r.ask_profit)} · ${pct(r.ask_margin)}</div>`:''}
+        <div>Max land price for a ${pct(DATA.assumptions.target_margin)} margin</div><div class="num">${money(r.rlv)} <span class="sub">${r.rlv&&r.assessed?(r.rlv/r.assessed).toFixed(2)+'× assessed':''}</span></div>
+      </div>
+    </div>
+  </div>`;
+  $('#close').addEventListener('click',()=>{st.sel=null;d.hidden=true;render();});
+  document.querySelectorAll('#tbl tbody tr').forEach(tr=>tr.setAttribute('aria-selected', cur[+tr.dataset.i]===r));
+  drawMap(cur.slice(0,st.shown));
+  if(window.innerWidth<960) d.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ---------- notes
+const A=DATA.assumptions;
+$('#notes').innerHTML=`
+<p><strong>What "pre-zoned" means here.</strong> Each parcel is given the densest for-sale (strata) building its <em>existing</em> district schedule allows without a rezoning — R1-1 multiplex at 1.0 FSR, RM apartment densities, C-2 mixed-use at 2.5–3.0 FSR, and the Broadway/Cambie R3 (2.0), R4 (4.0) and R5 (5.0–6.0 with 20% social housing) districts enacted October 2025. Bill 47 transit-oriented-area densities need a rezoning, so they are shown separately as upside.</p>
+<p><strong>Revenue</strong> = gross floor area × efficiency (${Object.values(A.typologies).map(t=>t.label.split(' (')[0]+' '+Math.round(t.eff*100)+'%').join(', ')}) × 2026 achievable $/sf by local area (e.g. Kitsilano wood-frame $${A.prices['Kitsilano'][1]}, Renfrew-Collingwood $${A.prices['Renfrew-Collingwood'][1]}, ground-oriented East Van $${A.prices['Kensington-Cedar Cottage'][0]}–${A.prices['Hastings-Sunrise'][0]}). Mixed-use sites carry 12% commercial floor at 85% of the residential price.</p>
+<p><strong>Costs.</strong> Acquisition at ${A.market_over_assessed}× the 2026 BC Assessment total plus property transfer tax, 1% closing, $60k demolition and 18 months of carry at 6.5%. Hard costs all-in: ${Object.values(A.typologies).map(t=>t.label.split(' (')[0]+' $'+t.hard).join(', ')} per buildable sf (Altus 2026 ranges plus parking and site work); soft costs ${Math.round(A.soft_pct*100)}% of hard. City DCL $${A.dcl.le_1_2}/$${A.dcl.le_1_5}/$${A.dcl.gt_1_5} per sf by FSR tier (Dec 2025 rates), Amenity Cost Charge $${A.acc.le_1_2}/$${A.acc.le_1_5}/$${A.acc.gt_1_5} (effective Sept 30 2026), Metro Vancouver and TransLink DCCs per unit, and the cash-in-lieu inclusionary rates for RM-8A and west-side R1-1 large lots.</p>
+<p><strong>Screened out</strong>: strata lots, tax-exempt parcels (parks, schools, churches, government), sites under ${A.filters.min_site_m2} m² or over ${int(A.filters.max_site_m2)} m², parcels whose assessed land value is implausibly low for their area (leaseholds, co-ops, partial interests), buildings newer than ${A.filters.year_built_cutoff} worth more than ${Math.round(A.filters.max_improvement_to_land_ratio*100)}% of their land, and RM/R3/R5 sites that look like existing apartment buildings (rental replacement applies). CD-1, DD, industrial and historic-area districts have no outright residential formula and are not scored.</p>
+<p><strong>Read the results as a screen, not an appraisal.</strong> Assessed values lag the market and owners of well-located commercial sites ask far more than assessment — which is exactly why C-2 corridor sites float to the top. The "max land price" column is the more useful number for negotiating: it is the purchase price that still leaves a ${pct(A.target_margin)} margin on cost. Frontage is estimated from area (RM-9/10/11 thresholds), heritage, view cones, soils and tenant relocation are not modelled, and every price and cost input is editable in <code>assumptions.json</code>.</p>
+<p class="meta">Data: City of Vancouver Open Data (property tax report 2026, parcel polygons, rapid transit stations, local area boundaries), CC-BY 4.0. Zoning schedules and levies as of September 2026.</p>`;
+
+// ---------- events
+const on=(sel,ev,fn)=>$(sel).addEventListener(ev,fn);
+on('#f-q','input',e=>{st.q=e.target.value;st.shown=100;render();});
+on('#f-budget','change',e=>{st.budget=e.target.value;st.shown=100;render();});
+on('#f-area','change',e=>{st.area=e.target.value;st.shown=100;render();});
+on('#f-min','input',e=>{st.min=e.target.value;render();}); on('#f-max','input',e=>{st.max=e.target.value;render();});
+on('#f-margin','input',e=>{st.margin=+e.target.value/100;$('#f-margin-v').textContent=e.target.value+'%';st.shown=100;render();});
+$('#f-margin-v').textContent=Math.round(st.margin*100)+'%';
+on('#f-sort','change',e=>{st.sort=e.target.value;st.shown=100;render();});
+document.querySelectorAll('#f-zones .chip[data-z],#f-zones .chip[data-g]').forEach(b=>b.addEventListener('click',()=>{const set=b.dataset.z?st.zones:st.groups, key=b.dataset.z||b.dataset.g; if(set.has(key)) set.delete(key); else set.add(key); b.setAttribute('aria-pressed',set.has(key)); st.shown=100; render();}));
+on('#f-listed','click',e=>{st.listed=!st.listed;e.currentTarget.setAttribute('aria-pressed',st.listed);render();});
+on('#more','click',()=>{st.shown+=100;render();});
+document.querySelectorAll('#tbl th[data-k]').forEach(th=>th.addEventListener('click',()=>{const k=th.dataset.k; if(k==='profit'){st.sort='profit';} else if(k==='margin'){st.sort='margin';} else if(k==='rlv'){st.sort='rlvx';} else return; $('#f-sort').value=st.sort; render();}));
+render();
+})();
+</script>
