@@ -1,0 +1,64 @@
+name: Build screener and publish to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: "17 9 * * 1"   # weekly refresh, Mondays 09:17 UTC
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pandas numpy requests
+      - name: Download City of Vancouver open data
+        run: python fetch_data.py
+      - name: Score every parcel
+        run: python score.py
+      - name: Build the dashboard and municipality comparison
+        run: |
+          python build_dashboard.py
+          python gva_compare.py
+          python - <<'EOF'
+          import json, datetime, shutil, os
+          os.makedirs("site", exist_ok=True)
+          d = json.load(open("output/gva_compare.json"))
+          d["generated"] = datetime.date.today().strftime("%B %d, %Y")
+          t = open("gva_template.html", encoding="utf-8").read()
+          open("site/gva_compare.html", "w", encoding="utf-8").write(t.replace("/*__DATA__*/", "const DATA=" + json.dumps(d, separators=(",", ":")) + ";"))
+          shutil.copy("output/dashboard.html", "site/index.html")
+          shutil.copy("output/dashboard.html", "site/dashboard.html")
+          for f in ("top100.csv", "top100.json", "summary.json"):
+              shutil.copy(os.path.join("output", f), os.path.join("site", f))
+          open("site/.nojekyll", "w").close()
+          EOF
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
