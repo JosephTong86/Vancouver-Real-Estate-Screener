@@ -1,0 +1,97 @@
+{
+  "_comment": "All money in CAD. Areas in sq ft unless noted. Edit freely and re-run score.py. Sources: Altus 2026 Cost Guide, CoV DCL bulletin (Dec 2025), CoV ACC (Sep 2026), Metro Van DCC 2026, CoV district schedules (2026), brokerage price surveys (vanplex, vancouverdwelling, raincity) 2026.",
+
+  "acquisition": {
+    "market_over_assessed": 1.10,
+    "_market_over_assessed": "Multiplier on BC Assessment total (land+improvement, July 1 2025 values). Vendors of redevelopment sites typically want a premium over assessment even in the soft 2026 market; 1.10 = 10% over assessed. Set to 1.00 for at-assessment pricing.",
+    "closing_costs_pct": 0.01,
+    "demolition_per_site": 60000,
+    "carry_months": 18,
+    "carry_rate_annual": 0.065
+  },
+
+  "typologies": {
+    "_comment": "hard = all-in hard cost $/sf GFA incl. site work & parking; eff = saleable/GFA; unit_sf = avg saleable unit size; dcc_type = Metro Van DCC class",
+    "duplex":     {"hard": 380, "eff": 0.92, "unit_sf": 1400, "dcc_type": "townhouse", "label": "Duplex / infill"},
+    "multiplex":  {"hard": 420, "eff": 0.90, "unit_sf": 1000, "dcc_type": "townhouse", "label": "Multiplex (3-6 units)"},
+    "townhouse":  {"hard": 400, "eff": 0.90, "unit_sf": 1150, "dcc_type": "townhouse", "label": "Townhouse / rowhouse"},
+    "woodframe":  {"hard": 360, "eff": 0.85, "unit_sf": 800,  "dcc_type": "apartment", "label": "4-6 storey wood-frame apt"},
+    "midrise":    {"hard": 430, "eff": 0.82, "unit_sf": 800,  "dcc_type": "apartment", "label": "8-12 storey concrete"},
+    "tower":      {"hard": 480, "eff": 0.80, "unit_sf": 750,  "dcc_type": "apartment", "label": "Concrete tower (18+ storeys)"}
+  },
+
+  "soft_cost_pct_of_hard": 0.22,
+  "commercial_share_mixed_use": 0.12,
+  "commercial_price_factor": 0.85,
+  "rental_value_factor": 0.70,
+  "_rental_value_factor": "Value of 100%-secured-rental floor area as a fraction of strata sale value (cap-rate valuation).",
+  "target_margin_on_cost": 0.15,
+
+  "levies": {
+    "dcl_per_sf": {"le_1_2": 7.53, "le_1_5": 16.22, "gt_1_5": 32.47},
+    "dcl_rental_waiver_pct": 0.80,
+    "acc_per_sf": {"le_1_2": 2.32, "le_1_5": 5.00, "gt_1_5": 10.00},
+    "metro_dcc_per_unit": {"apartment": 13392, "townhouse": 19874},
+    "translink_dcc_per_unit": 1800,
+    "permits_misc_per_unit": 6000
+  },
+
+  "inclusionary": {
+    "_comment": "Applied to strata options that carry a social-housing or cash-in-lieu obligation.",
+    "R5_strata_social_share": 0.20,
+    "R1-1_westside_large_lot_cash_per_sf": 27.50,
+    "R1-1_westside_large_lot_min_m2": 557,
+    "RM-8A_cash_per_sf": 44.00
+  },
+
+  "westside_areas": ["Dunbar-Southlands", "West Point Grey", "Kitsilano", "Arbutus Ridge", "Shaughnessy", "Kerrisdale", "South Cambie", "Oakridge", "Fairview", "West End", "Downtown"],
+
+  "prices_per_sf_saleable": {
+    "_comment": "2026 achievable (not asking) strata $/sf by local area: [ground-oriented (multiplex/TH), wood-frame apt, concrete apt]",
+    "Downtown":                 [1500, 1600, 1700],
+    "West End":                 [1450, 1550, 1700],
+    "Kitsilano":                [1350, 1400, 1550],
+    "West Point Grey":          [1350, 1400, 1550],
+    "Dunbar-Southlands":        [1300, 1300, 1450],
+    "Arbutus Ridge":            [1250, 1300, 1450],
+    "Shaughnessy":              [1450, 1400, 1500],
+    "Kerrisdale":               [1200, 1300, 1450],
+    "South Cambie":             [1250, 1400, 1550],
+    "Oakridge":                 [1200, 1400, 1550],
+    "Fairview":                 [1300, 1400, 1550],
+    "Mount Pleasant":           [1150, 1300, 1400],
+    "Riley Park":               [1100, 1250, 1400],
+    "Marpole":                  [900,  1100, 1250],
+    "Strathcona":               [900,  1100, 1200],
+    "Grandview-Woodland":       [950,  1150, 1250],
+    "Kensington-Cedar Cottage": [800,  1050, 1150],
+    "Hastings-Sunrise":         [800,  1000, 1100],
+    "Renfrew-Collingwood":      [750,  1000, 1150],
+    "Sunset":                   [800,  1000, 1100],
+    "Victoria-Fraserview":      [750,  950,  1050],
+    "Killarney":                [700,  950,  1050],
+    "_default":                 [900,  1100, 1200]
+  },
+
+  "toa": {
+    "_comment": "Bill 47 / CoV TOA Rezoning Policy (June 2026). Requires a rezoning application; max density needs 100% secured rental with 20% below-market. Not outright zoning - reported separately as upside.",
+    "tiers": [
+      {"max_m": 200, "fsr": 5.5, "typology": "tower",   "min_site_m2": 1348, "label": "TOA Tier 1 (<200 m, 20 st)"},
+      {"max_m": 400, "fsr": 4.0, "typology": "midrise", "min_site_m2": 1348, "label": "TOA Tier 2 (200-400 m, 12 st)"},
+      {"max_m": 800, "fsr": 3.0, "typology": "midrise", "min_site_m2": 460,  "label": "TOA Tier 3 (400-800 m, 8 st)"}
+    ],
+    "below_market_share": 0.20,
+    "below_market_value_factor": 0.60
+  },
+
+  "candidate_filter": {
+    "min_site_m2": 250,
+    "max_site_m2": 6000,
+    "min_land_per_m2_vs_median": 0.40,
+    "include_existing_apartments": false,
+    "min_land_value": 300000,
+    "max_improvement_to_land_ratio": 0.60,
+    "_max_improvement_to_land_ratio": "Sites with a valuable existing building (improvement > 60% of land value) are treated as already built-out unless older than year_built_cutoff.",
+    "year_built_cutoff": 1995
+  }
+}
