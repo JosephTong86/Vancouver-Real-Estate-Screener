@@ -276,7 +276,7 @@ const tip=$('#tip');
 let X=()=>0, Y=()=>0, mapView=null;
 function buildMap(){
   if(mapView===st.view) return; mapView=st.view; base.innerHTML='';
-  const areas=DATA.areas.filter(a=>st.view==='region' || (a.city||'vancouver')===st.view);
+  const areas0=DATA.areas.filter(a=>st.view==='region' || (a.city||'vancouver')===st.view); const areas=areas0.length?areas0:DATA.areas;
   const allLon=areas.flatMap(a=>a.rings.flat().map(p=>p[0])), allLat=areas.flatMap(a=>a.rings.flat().map(p=>p[1]));
   const lon0=Math.min(...allLon), lon1=Math.max(...allLon), lat0=Math.min(...allLat), lat1=Math.max(...allLat);
   const k=Math.cos(49.25*Math.PI/180); const sx=(W-20)/((lon1-lon0)*k), sy=(H-20)/(lat1-lat0); const s=Math.min(sx,sy);

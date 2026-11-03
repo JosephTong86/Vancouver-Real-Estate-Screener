@@ -50,14 +50,16 @@ CITIES = {
                               fields=["PID", "ADDRESS", "ZONING", "ZONECAT", "OCP", "SITEAREA", "FRONTAGE", "FSR", "FLRSPCE", "NGBRHOOD", "LANDUSE", "LANDUSECAT", "GISLINK"]),
                     footprints=dict(kind="arcgis", url="https://services3.arcgis.com/A7O8YnTNtzRPIn7T/arcgis/rest/services/Building_Footprints2/FeatureServer/0",
                                     fields=["BLDGAGE", "NUM_RES", "STRATA"])),
-    "cnv": dict(label="North Vancouver City", pmbc="North Vancouver, City%",
+    "cnv": dict(label="North Vancouver City", pmbc="North Vancouver%City%",
                 zoning=dict(kind="arcgis", url="https://gisext2.cnv.org/arcgis/rest/services/BaseMapServices/query_layers/MapServer/16", fields=["ZONING"]),
                 ocp=dict(kind="arcgis", url="https://gisext2.cnv.org/arcgis/rest/services/BaseMapServices/CityMapPro/MapServer/27", fields=["OCP_LU_CODE"]),
                 parcels_extra=dict(kind="arcgis", url="https://gisext2.cnv.org/arcgis/rest/services/BaseMapServices/query_layers/MapServer/2",
                                    fields=["ADDRESS", "PRC_ROLL_NO", "AREA_M", "HRTG_DSGN", "PRCLTYPE"], geometry=True)),
+    # DNV's GeoWeb dynamic layers answer attribute queries but withhold geometry, so they are read point-by-point
+    # (one spatial query per parcel centroid, 8 in parallel, ~6 min for 26k parcels).
     "dnv": dict(label="North Vancouver District", pmbc="North Vancouver%District%",
-                zoning=dict(kind="arcgis", url="https://geoweb.dnv.org/arcgis/rest/services/Data_DynamicLayers_Zoning/MapServer/0", fields=["Zoning"]),
-                ocp=dict(kind="arcgis", url="https://geoweb.dnv.org/arcgis/rest/services/Data_DynamicLayers_OCP/MapServer/0", fields=["OCPClass"])),
+                zoning=dict(kind="point", url="https://geoweb.dnv.org/arcgis/rest/services/Data_DynamicLayers_Zoning/MapServer/0", fields=["Zoning"]),
+                ocp=dict(kind="point", url="https://geoweb.dnv.org/arcgis/rest/services/Data_DynamicLayers_OCP/MapServer/0", fields=["OCPClass"])),
 }
 
 # SkyTrain stations for the whole region come from New Westminster's open layer (52 points).
@@ -138,6 +140,40 @@ def pmbc_pages(muni_like, count=5000):
         if len(feats) < count:
             break
         start += count
+
+
+def point_lookup(url, fields, points, workers=8):
+    """Attribute lookup by point-in-polygon spatial query, one request per point (for layers that withhold geometry).
+    points: list of (lon, lat). Returns list of attribute dicts (or None) in the same order."""
+    from concurrent.futures import ThreadPoolExecutor
+    sess = requests.Session()
+    sess.headers.update(S.headers)
+
+    def one(pt):
+        lon, lat = pt
+        p = {"geometry": f"{lon:.6f},{lat:.6f}", "geometryType": "esriGeometryPoint", "inSR": 4326,
+             "spatialRel": "esriSpatialRelIntersects", "returnGeometry": "false", "outFields": ",".join(fields), "f": "json"}
+        for i in range(3):
+            try:
+                r = sess.get(url + "/query", params=p, timeout=60)
+                if r.status_code == 200:
+                    js = r.json()
+                    if "error" in js:
+                        return None
+                    f = js.get("features") or []
+                    return f[0].get("attributes") if f else {}
+            except Exception:
+                pass
+            time.sleep(1 + i)
+        return None
+
+    out = [None] * len(points)
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        for i, res in enumerate(ex.map(one, points, chunksize=50)):
+            out[i] = res
+            if i and i % 5000 == 0:
+                print(f"    point lookups: {i:,}/{len(points):,}", flush=True)
+    return out
 
 
 def feature_rows(feats, fields):
@@ -233,6 +269,8 @@ def zoning_lookup(city):
     z = cfg.get("zoning")
     if not z:
         return None, "none"
+    if z["kind"] == "point":
+        return "point", z["url"]
     attrs, polys = [], []
     if z["kind"] == "arcgis":
         for pr, g in feature_rows(arcgis_pages(z["url"], z["fields"]), z["fields"]):
@@ -246,14 +284,14 @@ def zoning_lookup(city):
         feats = js.get("features", [])
         keys = list((feats[0].get("properties") or {}).keys()) if feats else []
         print(f"  MountainMath zoning: {len(feats):,} features, keys {keys}")
-        mkey = next((k for k in keys if any(str((f.get('properties') or {}).get(k, '')).strip().lower().startswith(z['muni'].lower()) for f in feats[:5000])), None)
+        mkey = next((k for k in keys if any(z['muni'].lower() in str((f.get('properties') or {}).get(k, '')).lower() for f in feats)), None)
         zkey = next((k for k in keys if k.lower() in ("zone", "zoning", "z", "zone_code", "zoning_code", "zc_code")), None)
         if zkey is None:
             zkey = next((k for k in keys if "zon" in k.lower()), None)
         print(f"  MountainMath zoning: municipality key={mkey} zone key={zkey}")
         for f in feats:
             pr = f.get("properties") or {}
-            if mkey and not str(pr.get(mkey, "")).lower().startswith(z["muni"].lower()):
+            if mkey and z["muni"].lower() not in str(pr.get(mkey, "")).lower():
                 continue
             if f.get("geometry"):
                 attrs.append({"ZONING": pr.get(zkey), "_all": {k: pr.get(k) for k in keys if k != "geometry"}}); polys.append(f["geometry"])
@@ -268,6 +306,8 @@ def ocp_lookup(city):
     o = cfg.get("ocp")
     if not o:
         return None
+    if o["kind"] == "point":
+        return "point"
     attrs, polys = [], []
     for pr, g in feature_rows(arcgis_pages(o["url"], o["fields"]), o["fields"]):
         if g:
@@ -331,6 +371,11 @@ def assemble_city(city, stations):
             r.update(city=city, address="", zone=None, overlay="", zcat="", ocp="", strata=False, year_built=None,
                      existing_fsr=None, neighbourhood="", landuse="")
         zl, zsrc = zoning_lookup(city)
+        if zl == "point":
+            z = cfg["zoning"]
+            print(f"  zoning by point query ({len(rows):,} parcels, 8 workers) ...", flush=True)
+            res = point_lookup(z["url"], z["fields"], [(r["lon"], r["lat"]) for r in rows])
+            zl = (lambda cache: (lambda lon, lat: cache.get((lon, lat))))({(r["lon"], r["lat"]): a for r, a in zip(rows, res) if a})
         if zl:
             miss = 0
             for r in rows:
@@ -348,6 +393,12 @@ def assemble_city(city, stations):
                     r["zone"] = a.get("Zoning")
             print(f"  zoning join: {len(rows) - miss:,} matched, {miss:,} unmatched")
         ol = ocp_lookup(city)
+        if ol == "point":
+            o = cfg["ocp"]
+            print(f"  OCP by point query ({len(rows):,} parcels) ...", flush=True)
+            res = point_lookup(o["url"], o["fields"], [(r["lon"], r["lat"]) for r in rows])
+            cache = {(r["lon"], r["lat"]): a for r, a in zip(rows, res) if a}
+            ol = lambda lon, lat: cache.get((lon, lat))
         if ol:
             for r in rows:
                 a = ol(r["lon"], r["lat"])
@@ -400,13 +451,16 @@ def assemble_city(city, stations):
         if not r.get("frontage_m"):
             r["frontage_m"] = None
     # boundary for the dashboard map
-    try:
-        pts = [Point(r["lon"], r["lat"]) for r in rows]
-        hull = concave_hull(unary_union(pts), ratio=0.08)
-        b = hull.simplify(0.0008)
-        boundary = json.loads(json.dumps(b.__geo_interface__))
-    except Exception as e:
-        print("  boundary hull failed:", e); boundary = None
+    boundary = None
+    if len(rows) >= 50:
+        try:
+            pts = [Point(r["lon"], r["lat"]) for r in rows]
+            hull = concave_hull(unary_union(pts), ratio=0.08)
+            b = hull.simplify(0.0008)
+            if b.geom_type in ("Polygon", "MultiPolygon") and not b.is_empty:
+                boundary = json.loads(json.dumps(b.__geo_interface__))
+        except Exception as e:
+            print("  boundary hull failed:", e)
     cols = ["city", "pid", "address", "zone", "overlay", "zcat", "ocp", "site_m2", "frontage_m", "lat", "lon", "parcel_class", "owner_type",
             "strata", "year_built", "existing_fsr", "neighbourhood", "landuse", "heritage", "nearest_station", "station_dist_m", "station_kind", "zoning_source"]
     path = os.path.join(OUT, f"{city}.csv")

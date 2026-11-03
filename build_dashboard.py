@@ -123,10 +123,13 @@ for a in aux["areas"]:
 bpath = os.path.join(HERE, "data", "metro", "boundaries.json")
 if os.path.exists(bpath):
     for code, b in json.load(open(bpath)).items():
-        gm = b["geometry"]
+        gm = b.get("geometry") or {}
+        if gm.get("type") not in ("Polygon", "MultiPolygon") or not gm.get("coordinates"):
+            continue
         polys = [gm["coordinates"]] if gm["type"] == "Polygon" else gm["coordinates"]
-        rings = [[[round(p[0], 4), round(p[1], 4)] for p in pg[0]] for pg in polys]
-        areas.append({"name": b["name"], "rings": rings, "city": code})
+        rings = [[[round(p[0], 4), round(p[1], 4)] for p in pg[0]] for pg in polys if pg and len(pg[0]) >= 4]
+        if rings:
+            areas.append({"name": b["name"], "rings": rings, "city": code})
 
 stations = [{"n": st["station"], "lat": round(st["lat"], 5), "lon": round(st["lon"], 5)} for st in aux["stations"] if st.get("lat")]
 spath = os.path.join(HERE, "data", "metro", "stations.json")

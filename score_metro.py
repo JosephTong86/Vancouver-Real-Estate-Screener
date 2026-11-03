@@ -83,6 +83,9 @@ def score_city(city):
         print(f"-- {cfg['label']}: no data file, skipped")
         return None
     df = pd.read_csv(path, dtype={"pid": str, "zone": str, "overlay": str, "ocp": str, "address": str}, low_memory=False)
+    if len(df) == 0:
+        print(f"-- {cfg['label']}: data file is empty (fetch failed), skipped")
+        return None
     for c in ("site_m2", "frontage_m", "lat", "lon", "station_dist_m", "year_built", "existing_fsr"):
         df[c] = pd.to_numeric(df[c], errors="coerce")
     df["strata"] = df["strata"].astype(str).str.lower().isin(("true", "1", "y", "yes"))
@@ -145,14 +148,24 @@ def score_city(city):
         else:
             toa_rows.append(None)
     oz = pd.DataFrame([x if x else {} for x in rows], index=df.index)
-    for c in oz.columns:
-        df["oz_" + c] = oz[c]
+    for c in ("gfa_sf", "saleable_sf", "units", "price_psf", "revenue", "acquisition", "hard", "soft", "levies", "total_cost", "profit",
+              "margin", "land_per_buildable", "rlv_at_target", "rlv_vs_assessed", "fsr", "typology", "tenure", "storeys", "zoning_note",
+              "incl", "grade", "land_grade", "acq_price"):
+        df["oz_" + c] = oz[c] if c in oz else np.nan
     tz = pd.DataFrame([x if x else {} for x in toa_rows], index=df.index)
     for c in ("fsr", "typology", "tier", "gfa_sf", "revenue", "total_cost", "profit", "margin"):
         df["toa_" + c] = tz[c] if c in tz else np.nan
 
     scored = df[df["oz_profit"].notna()].copy()
     tgt = A["target_margin_on_cost"]
+    if len(scored) == 0:
+        print(f"-- {cfg['label']}: {len(df):,} parcels, nothing scorable (zones seen: {df['zone'].value_counts().head(8).to_dict()})")
+        summ = {"city": cfg["label"], "parcels_total": int(len(df)), "parcels_with_zone": int((df["zone"] != "").sum()),
+                "parcels_candidates": int(df["is_candidate"].sum()), "parcels_scored": 0, "positive_margin": 0, "clearing_target": 0,
+                "median_profit_top100": None, "median_margin_top100": None, "by_zone_top100": {}, "by_typology_top100": {},
+                "land_ref_m2": ref, "grade_land": cfg["grade_land"], "grade_zoning": cfg["grade_zoning"],
+                "zones_seen": df["zone"].value_counts().head(30).to_dict()}
+        return scored, summ
     scored["clears_target"] = scored["oz_margin"] >= tgt
     scored = scored.sort_values("oz_profit", ascending=False)
     scored["rank_profit"] = np.arange(1, len(scored) + 1)
