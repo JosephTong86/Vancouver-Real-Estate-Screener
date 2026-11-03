@@ -24,18 +24,24 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install pandas numpy requests
+      - run: pip install pandas numpy requests shapely
       - name: Download City of Vancouver open data
         run: python fetch_data.py
-      - name: Score every parcel
+      - name: Score every Vancouver parcel
         run: python score.py
+      - name: Download inner-ring municipal data (Burnaby, Richmond, New Westminster, North Vancouver City & District)
+        continue-on-error: true
+        run: python fetch_metro.py
+      - name: Score the inner-ring municipalities
+        continue-on-error: true
+        run: python score_metro.py
       - name: Build the dashboard and municipality comparison
         run: |
           python build_dashboard.py
           python gva_compare.py
           python - <<'EOF'
-          import json, datetime, shutil, os
-          os.makedirs("site", exist_ok=True)
+          import json, datetime, shutil, os, glob
+          os.makedirs("site/metro", exist_ok=True)
           d = json.load(open("output/gva_compare.json"))
           d["generated"] = datetime.date.today().strftime("%B %d, %Y")
           t = open("gva_template.html", encoding="utf-8").read()
@@ -44,6 +50,10 @@ jobs:
           shutil.copy("output/dashboard.html", "site/dashboard.html")
           for f in ("top100.csv", "top100.json", "summary.json"):
               shutil.copy(os.path.join("output", f), os.path.join("site", f))
+          if os.path.exists("output/metro_summary.json"):
+              shutil.copy("output/metro_summary.json", "site/metro/summary.json")
+          for f in glob.glob("output/metro/*_top100.csv"):
+              shutil.copy(f, os.path.join("site/metro", os.path.basename(f)))
           open("site/.nojekyll", "w").close()
           EOF
       - uses: actions/configure-pages@v5
