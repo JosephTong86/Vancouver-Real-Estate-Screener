@@ -82,17 +82,16 @@ current to September 2026 — see the dashboard's notes section for the specific
 This is a screening tool, not an appraisal: assessments lag the market, frontage is estimated,
 and heritage, view cones, soils, tenant relocation and financing structure are not modelled.
 
-## Regenerating
+## Inner-ring municipalities (Burnaby, Richmond, New Westminster, North Vancouver City & District)
 
 ```
-python fetch_data.py        # City of Vancouver open data -> data/
-python fetch_rew.py         # public REW listings -> data/listings_raw.csv (paced crawl)
-python match_listings.py    # -> data/listings.csv
-python score.py             # -> output/all_scored.csv, top100.csv, summary.json
-python build_dashboard.py   # -> output/dashboard.html
-python gva_compare.py       # -> output/gva_compare.html
+pip install shapely
+python fetch_metro.py      # ParcelMap BC + each city's open zoning / parcel layers -> data/metro/<city>.csv
+python score_metro.py      # same pro forma, city fee schedules, modelled land values -> output/metro/
+python build_dashboard.py  # dashboard gains a View selector: region or one city
 ```
 
-`output/all_scored.csv` (42 MB, every scored parcel) is not committed; `score.py` rebuilds it in about a minute. All model inputs are in `assumptions.json`.
-
-Data: City of Vancouver open data (CC-BY 4.0), BC Assessment values via the 2026 property-tax report, public REW.ca listings crawled 15 Sep 2026. Margins are estimates for screening, not appraisals; see `output/data_lineage.html`.
+Outside Vancouver no assessed values are open data, so acquisition prices are **modelled** from the GVR HPI
+benchmark and lot size (grade C) and every row carries a zoning-rule grade (A–D). Sources, rules and known gaps:
+`docs/metro_sources.md`. Richmond has no open zoning layer; a c.2020 academic zoning map is remapped to the 2024 RSM
+pre-zoning, so treat Richmond results as indicative.

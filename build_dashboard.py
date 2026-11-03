@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Build the self-contained dashboard (output/dashboard.html) from output/all_scored.csv."""
-import json, os, math
+"""Build the self-contained dashboard (output/dashboard.html) from output/all_scored.csv (Vancouver) and,
+when present, output/metro/all_scored.csv (inner-ring municipalities scored by score_metro.py)."""
+import json, os, math, re
 import pandas as pd
 import numpy as np
 
@@ -10,36 +11,106 @@ aux = json.load(open(os.path.join(HERE, "data", "aux.json")))
 summary = json.load(open(os.path.join(HERE, "output", "summary.json")))
 df = pd.read_csv(os.path.join(HERE, "output", "all_scored.csv"), low_memory=False)
 
-# rows worth showing: any site with a non-negative modelled margin, plus every top-100 row
-keep = df[(df["oz_margin"] >= 0) | (df["rank_profit"] <= 100)].copy()
-keep = keep.sort_values("oz_profit", ascending=False)
-
 GROUP = {"duplex": "G", "multiplex": "G", "townhouse": "G", "woodframe": "W", "midrise": "C", "tower": "C"}
+MAX_ROWS_PER_CITY = 2500
+
 
 def r(x, d=0):
     if x is None or (isinstance(x, float) and (math.isnan(x) or math.isinf(x))):
         return None
     return round(float(x), d)
 
-rows = []
-for t in keep.itertuples(index=False):
-    rows.append([
-        t.address, t.postal if isinstance(t.postal, str) else "", t.local_area, t.zone,
-        r(t.area_m2, 0), r(t.assessed_total), r(t.land_value), r(t.improvement_value),
-        int(t.year_built) if not pd.isna(t.year_built) else None,
-        r(t.oz_fsr, 2), t.oz_typology, GROUP.get(t.oz_typology, "W"), t.oz_tenure, int(t.oz_storeys) if not pd.isna(t.oz_storeys) else None,
-        r(t.oz_gfa_sf), r(t.oz_units), r(t.oz_price_psf), r(t.oz_revenue), r(t.oz_acquisition), r(t.oz_hard), r(t.oz_soft), r(t.oz_levies),
-        r(t.oz_total_cost), r(t.oz_profit), r(t.oz_margin, 4), r(t.oz_land_per_buildable), r(t.oz_rlv_at_target),
-        t.nearest_station, r(t.station_dist_m), t.toa_tier if isinstance(t.toa_tier, str) else None, r(t.toa_fsr, 2), r(t.toa_profit), r(t.toa_margin, 4),
-        bool(t.listed), r(t.list_price), t.listing_url if isinstance(t.listing_url, str) else "", r(t.ask_profit), r(t.ask_margin, 4),
-        r(t.lat, 5), r(t.lon, 5), t.oz_zoning_note if isinstance(t.oz_zoning_note, str) else "", str(t.pid).split(";")[0].strip(),
-        bool(t.likely_existing_apartment), int(t.stacked_parcels) if not pd.isna(t.stacked_parcels) else 1,
-    ])
+
+def s(x):
+    return x if isinstance(x, str) else ""
+
+
+def fam(city, zone):
+    """Generic zoning family for the chip filter, across municipalities."""
+    z = str(zone).upper()
+    if city == "vancouver":
+        if z.startswith("R1-"): return "R1"
+        if z.startswith("RT"): return "RT"
+        if z.startswith("RM"): return "RM"
+        if re.match(r"^R[345]-", z): return "R345"
+        if z.startswith("C-"): return "C"
+        if z.startswith("RR"): return "RR"
+        return "other"
+    if city == "burnaby":
+        if z == "R1" or re.match(r"^R[1-5]$|^R1[0-2]$", z): return "R1"
+        if z in ("R2", "R2R", "RM1", "RM2"): return "RT"
+        if z.startswith("C") or z.startswith("E1"): return "C"
+        if z.endswith("R"): return "RR"
+        return "RM"
+    if city == "richmond":
+        if z.startswith("RSM") or z.startswith("RS"): return "R1"
+        if z.startswith(("RD", "RT", "RI", "RCD")): return "RT"
+        if z.startswith(("CDT", "CS", "RCL", "CN")): return "C"
+        return "RM"
+    if city == "newwest":
+        if z.startswith("RGO"): return "R1"
+        if z.startswith("RT"): return "RT"
+        if z.startswith("C-"): return "C"
+        return "RM"
+    if city == "cnv":
+        if z == "GO": return "R1"
+        if z.startswith("RG"): return "RT"
+        if z.startswith(("C-", "LL")): return "C"
+        return "RM"
+    if city == "dnv":
+        if z == "R2" or z.startswith("RS"): return "R1"
+        if z.startswith("C"): return "C"
+        return "RM"
+    return "other"
+
+
+def row_from(t, city):
+    """One dashboard row from a scored record (works for the Vancouver and metro tables)."""
+    g = lambda k, d=None: getattr(t, k, d)
+    assessed = g("assessed_total"); land = g("land_value"); imp = g("improvement_value")
+    return [
+        g("address"), s(g("postal", "")), g("local_area"), g("zone"),
+        r(g("area_m2") if city == "vancouver" else g("site_m2"), 0), r(assessed), r(land), r(imp),
+        int(g("year_built")) if not pd.isna(g("year_built", np.nan)) else None,
+        r(g("oz_fsr"), 2), g("oz_typology"), GROUP.get(g("oz_typology"), "W"), g("oz_tenure"), int(g("oz_storeys")) if not pd.isna(g("oz_storeys", np.nan)) else None,
+        r(g("oz_gfa_sf")), r(g("oz_units")), r(g("oz_price_psf")), r(g("oz_revenue")), r(g("oz_acquisition")), r(g("oz_hard")), r(g("oz_soft")), r(g("oz_levies")),
+        r(g("oz_total_cost")), r(g("oz_profit")), r(g("oz_margin"), 4), r(g("oz_land_per_buildable")), r(g("oz_rlv_at_target")),
+        g("nearest_station"), r(g("station_dist_m")), s(g("toa_tier")) or None, r(g("toa_fsr"), 2), r(g("toa_profit")), r(g("toa_margin"), 4),
+        bool(g("listed", False)), r(g("list_price")), s(g("listing_url", "")), r(g("ask_profit")), r(g("ask_margin"), 4),
+        r(g("lat"), 5), r(g("lon"), 5), s(g("oz_zoning_note", "")), str(g("pid")).split(";")[0].strip(),
+        bool(g("likely_existing_apartment", False)), int(g("stacked_parcels")) if not pd.isna(g("stacked_parcels", np.nan)) else 1,
+        city, s(g("oz_grade", "A")) or "A", s(g("oz_land_grade", "A")) or "A", fam(city, g("zone")),
+    ]
+
+
 COLS = ["address","postal","area","zone","site_m2","assessed","land","improvement","year_built","fsr","typology","group","tenure","storeys",
         "gfa","units","price_psf","revenue","acquisition","hard","soft","levies","cost","profit","margin","land_psf_buildable","rlv",
-        "station","station_m","toa_tier","toa_fsr","toa_profit","toa_margin","listed","list_price","listing_url","ask_profit","ask_margin","lat","lon","note","pid","existing_apt","stacked"]
+        "station","station_m","toa_tier","toa_fsr","toa_profit","toa_margin","listed","list_price","listing_url","ask_profit","ask_margin","lat","lon","note","pid","existing_apt","stacked",
+        "city","grade","land_grade","fam"]
 
-# local-area outlines, simplified
+# ---- Vancouver rows: any site with a non-negative modelled margin, plus every top-100 row
+keep = df[(df["oz_margin"] >= 0) | (df["rank_profit"] <= 100)].copy().sort_values("oz_profit", ascending=False)
+rows = [row_from(t, "vancouver") for t in keep.itertuples(index=False)]
+cities = [{"code": "vancouver", "label": "Vancouver", "parcels": int(summary["parcels_total"]), "scored": int(summary["parcels_scored"]),
+           "clearing": int(summary["clearing_target"]), "rows": len(rows), "grade_land": "A", "grade_zoning": "A",
+           "value_basis": "BC Assessment 2026 roll"}]
+
+# ---- inner-ring municipalities
+metro_path = os.path.join(HERE, "output", "metro", "all_scored.csv")
+msum_path = os.path.join(HERE, "output", "metro_summary.json")
+if os.path.exists(metro_path) and os.path.exists(msum_path):
+    m = pd.read_csv(metro_path, low_memory=False, dtype={"pid": str})
+    msum = json.load(open(msum_path))
+    for code, cs in msum.items():
+        sub = m[m["city"] == code].sort_values("oz_profit", ascending=False)
+        sub = sub[(sub["oz_margin"] >= 0) | (sub["rank_profit"] <= 100)].head(MAX_ROWS_PER_CITY)
+        n0 = len(rows)
+        rows += [row_from(t, code) for t in sub.itertuples(index=False)]
+        cities.append({"code": code, "label": cs["city"], "parcels": cs["parcels_total"], "scored": cs["parcels_scored"],
+                       "clearing": cs["clearing_target"], "rows": len(rows) - n0, "grade_land": cs["grade_land"], "grade_zoning": cs["grade_zoning"],
+                       "value_basis": "modelled from GVR HPI benchmark x lot size"})
+
+# ---- outlines: Vancouver local areas + municipal hulls
 areas = []
 for a in aux["areas"]:
     polys = [a["coords"]] if a["type"] == "Polygon" else a["coords"]
@@ -48,10 +119,25 @@ for a in aux["areas"]:
         ring = pg[0]
         step = max(1, len(ring) // 120)
         rings.append([[round(p[0], 4), round(p[1], 4)] for p in ring[::step]])
-    areas.append({"name": a["name"], "rings": rings})
-stations = [{"n": s["station"], "lat": round(s["lat"], 5), "lon": round(s["lon"], 5)} for s in aux["stations"] if s.get("lat")]
+    areas.append({"name": a["name"], "rings": rings, "city": "vancouver"})
+bpath = os.path.join(HERE, "data", "metro", "boundaries.json")
+if os.path.exists(bpath):
+    for code, b in json.load(open(bpath)).items():
+        gm = b["geometry"]
+        polys = [gm["coordinates"]] if gm["type"] == "Polygon" else gm["coordinates"]
+        rings = [[[round(p[0], 4), round(p[1], 4)] for p in pg[0]] for pg in polys]
+        areas.append({"name": b["name"], "rings": rings, "city": code})
 
-payload = {"cols": COLS, "rows": rows, "areas": areas, "stations": stations, "summary": summary,
+stations = [{"n": st["station"], "lat": round(st["lat"], 5), "lon": round(st["lon"], 5)} for st in aux["stations"] if st.get("lat")]
+spath = os.path.join(HERE, "data", "metro", "stations.json")
+if os.path.exists(spath):
+    seen = {(round(x["lat"], 3), round(x["lon"], 3)) for x in stations}
+    for st in json.load(open(spath)):
+        k = (round(st["lat"], 3), round(st["lon"], 3))
+        if k not in seen:
+            stations.append({"n": st["station"], "lat": round(st["lat"], 5), "lon": round(st["lon"], 5), "kind": st.get("kind", "skytrain")}); seen.add(k)
+
+payload = {"cols": COLS, "rows": rows, "areas": areas, "stations": stations, "summary": summary, "cities": cities,
            "assumptions": {
                "market_over_assessed": A["acquisition"]["market_over_assessed"],
                "target_margin": A["target_margin_on_cost"], "soft_pct": A["soft_cost_pct_of_hard"],
@@ -66,4 +152,4 @@ tpl = open(os.path.join(HERE, "dashboard_template.html"), encoding="utf-8").read
 html = tpl.replace("/*__DATA__*/", "const DATA=" + json.dumps(payload, separators=(",", ":")) + ";")
 out = os.path.join(HERE, "output", "dashboard.html")
 open(out, "w", encoding="utf-8").write(html)
-print(f"wrote {out}: {len(rows):,} rows, {os.path.getsize(out)/1e6:.1f} MB")
+print(f"wrote {out}: {len(rows):,} rows across {len(cities)} municipalities, {os.path.getsize(out)/1e6:.1f} MB")

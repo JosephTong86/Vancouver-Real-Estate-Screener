@@ -98,18 +98,19 @@ details.notes td,details.notes th{padding:4px 10px;cursor:default;position:stati
 <div class="wrap">
 <header>
   <div>
-    <div class="eyebrow">City of Vancouver · fee-simple parcels · outright zoning</div>
-    <h1>Vancouver Redevelopment Screener</h1>
-    <p>Every parcel scored on what its <em>current</em> zoning already permits: buildable floor area × achievable 2026 sale price, less construction, levies and an acquisition at assessed value. Ranked by modelled profit.</p>
+    <div class="eyebrow" id="eyebrow">Metro Vancouver · fee-simple parcels · outright zoning</div>
+    <h1 id="h1">Vancouver Redevelopment Screener</h1>
+    <p>Every parcel scored on what its <em>current</em> zoning already permits: buildable floor area × achievable 2026 sale price, less construction, levies and an acquisition at assessed value (Vancouver) or a modelled lot value (other municipalities). Ranked by modelled profit.</p>
   </div>
   <div class="meta" id="meta"></div>
 </header>
 
 <section class="controls" aria-label="Filters">
+  <div class="ctl"><label for="f-view">View</label><select id="f-view"><option value="region">All cities (region)</option></select></div>
   <div class="ctl"><label for="f-q">Search address / zone</label><input type="text" id="f-q" placeholder="e.g. Broadway, C-2A, Kitsilano"></div>
-  <div class="ctl"><label for="f-budget">Max assessed value</label>
+  <div class="ctl"><label for="f-budget" id="lbl-budget">Max assessed value</label>
     <select id="f-budget"><option value="">Any budget</option><option value="2000000">≤ $2M</option><option value="3000000">≤ $3M</option><option value="5000000">≤ $5M</option><option value="10000000">≤ $10M</option><option value="25000000">≤ $25M</option></select></div>
-  <div class="ctl"><label for="f-area">Local area</label><select id="f-area"><option value="">All 22 areas</option></select></div>
+  <div class="ctl"><label for="f-area">Local area</label><select id="f-area"><option value="">All areas</option></select></div>
   <div class="ctl"><label for="f-min">Site size m² (min – max)</label>
     <div style="display:flex;gap:6px"><input type="number" id="f-min" placeholder="min" min="0" step="50"><input type="number" id="f-max" placeholder="max" min="0" step="50"></div></div>
   <div class="ctl"><label for="f-margin">Min margin on cost: <span id="f-margin-v" class="num">15%</span></label><input type="range" id="f-margin" min="0" max="60" step="5" value="15"></div>
@@ -117,12 +118,12 @@ details.notes td,details.notes th{padding:4px 10px;cursor:default;position:stati
     <select id="f-sort"><option value="profit">Profit ($)</option><option value="margin">Margin (% on cost)</option><option value="rlvx">Max land price ÷ assessed</option><option value="best">Best of outright / TOA rezoning</option></select></div>
   <div class="ctl" style="grid-column:1/-1"><label>Zoning family</label>
     <div class="chips" id="f-zones">
-      <button class="chip" data-z="R1" aria-pressed="true">R1-1 multiplex</button>
-      <button class="chip" data-z="RT" aria-pressed="true">RT duplex / infill</button>
-      <button class="chip" data-z="RM" aria-pressed="true">RM apartment</button>
-      <button class="chip" data-z="R345" aria-pressed="true">R3 / R4 / R5 Broadway &amp; Cambie pre-zoned</button>
-      <button class="chip" data-z="C" aria-pressed="true">C-2 / C-3A mixed-use</button>
-      <button class="chip" data-z="RR" aria-pressed="true">RR secured rental</button>
+      <button class="chip" data-z="R1" aria-pressed="true">Multiplex / SSMUH (R1-1, R1, RSM, RGO, GO)</button>
+      <button class="chip" data-z="RT" aria-pressed="true">Duplex / townhouse (RT, RD, RG, R2)</button>
+      <button class="chip" data-z="RM" aria-pressed="true">Apartment districts (RM, RA, R3–R8, MID)</button>
+      <button class="chip" data-z="R345" aria-pressed="true">Vancouver R3 / R4 / R5 pre-zoned</button>
+      <button class="chip" data-z="C" aria-pressed="true">Mixed-use commercial (C, CDT, RCL)</button>
+      <button class="chip" data-z="RR" aria-pressed="true">Secured rental only</button>
       <span style="width:12px"></span>
       <button class="chip" data-g="G" aria-pressed="true"><i class="dot" style="background:var(--g)"></i>Ground-oriented</button>
       <button class="chip" data-g="W" aria-pressed="true"><i class="dot" style="background:var(--w)"></i>Wood-frame apt</button>
@@ -169,49 +170,74 @@ const fmtM = v => v==null? '—' : (Math.abs(v)>=1e6? (v/1e6).toLocaleString('en
 const money = v => v==null? '—' : (v<0?'−':'')+'$'+fmtM(Math.abs(v));
 const pct = v => v==null? '—' : (v*100).toFixed(0)+'%';
 const int = v => v==null? '—' : Math.round(v).toLocaleString('en-CA');
-const zfam = z => z.startsWith('R1-')?'R1': z.startsWith('RT')?'RT': z.startsWith('RM')?'RM': /^R[345]-/.test(z)?'R345': z.startsWith('C-')?'C': z.startsWith('RR')?'RR':'other';
 const TYPO = DATA.assumptions.typologies;
 const GCOL = {G:'var(--g)',W:'var(--w)',C:'var(--c)'};
+const CITIES = DATA.cities || [{code:'vancouver',label:'Vancouver',parcels:DATA.summary.parcels_total,scored:DATA.summary.parcels_scored,clearing:DATA.summary.clearing_target,grade_land:'A',grade_zoning:'A'}];
+const CITY = {}; CITIES.forEach(c=>CITY[c.code]=c);
+const multi = CITIES.length>1;
+const isVan = r => r.city==='vancouver' || !r.city;
+const GRADE_TXT = {A:'A · bylaw / assessment roll',B:'B · city bulletin or secondary source',C:'C · derived or modelled',D:'D · placeholder, verify'};
 
 // ---------- state
-const st = {q:'',budget:'',area:'',min:'',max:'',margin:0.15,sort:'profit',zones:new Set(['R1','RT','RM','R345','C','RR']),groups:new Set(['G','W','C']),listed:false,shown:100,sel:null};
-try{const s=JSON.parse(localStorage.getItem('vrs-filters')||'null'); if(s){Object.assign(st,s,{zones:new Set(s.zones),groups:new Set(s.groups),shown:100,sel:null});}}catch(e){}
+const st = {view: multi?'region':'vancouver', q:'',budget:'',area:'',min:'',max:'',margin:0.15,sort:'profit',zones:new Set(['R1','RT','RM','R345','C','RR']),groups:new Set(['G','W','C']),listed:false,shown:100,sel:null};
+try{const s=JSON.parse(localStorage.getItem('vrs-filters')||'null'); if(s){Object.assign(st,s,{zones:new Set(s.zones),groups:new Set(s.groups),shown:100,sel:null}); if(!CITY[st.view] && st.view!=='region') st.view=multi?'region':'vancouver';}}catch(e){}
 function save(){try{localStorage.setItem('vrs-filters',JSON.stringify({...st,zones:[...st.zones],groups:[...st.groups]}));}catch(e){}}
+const viewRows = () => st.view==='region' ? rows : rows.filter(r=>(r.city||'vancouver')===st.view);
+const vanView = () => st.view==='vancouver';
 
-// populate area select
-[...new Set(rows.map(r=>r.area).filter(Boolean))].sort().forEach(a=>{const o=document.createElement('option');o.value=a;o.textContent=a;$('#f-area').appendChild(o);});
-$('#f-q').value=st.q; $('#f-budget').value=st.budget; $('#f-area').value=st.area; $('#f-min').value=st.min; $('#f-max').value=st.max; $('#f-margin').value=st.margin*100; $('#f-sort').value=st.sort;
+// populate view + area selects
+CITIES.forEach(c=>{const o=document.createElement('option');o.value=c.code;o.textContent=c.label+(c.code==='vancouver'?' (assessed values)':' (modelled values)');$('#f-view').appendChild(o);});
+if(!multi){$('#f-view').querySelector('option[value=region]').remove();}
+function fillAreas(){const sel=$('#f-area'); sel.innerHTML='<option value="">All areas</option>'; const vr=viewRows();
+  const names=[...new Set(vr.map(r=>r.area).filter(Boolean))].sort(); names.forEach(a=>{const o=document.createElement('option');o.value=a;o.textContent=(st.view==='region'? (CITY[vr.find(r=>r.area===a).city||'vancouver']||{}).label+' · ' : '')+a;sel.appendChild(o);});
+  sel.value = names.includes(st.area)? st.area : (st.area='');}
+fillAreas();
+$('#f-view').value=st.view; $('#f-q').value=st.q; $('#f-budget').value=st.budget; $('#f-min').value=st.min; $('#f-max').value=st.max; $('#f-margin').value=st.margin*100; $('#f-sort').value=st.sort;
 document.querySelectorAll('#f-zones .chip[data-z]').forEach(b=>b.setAttribute('aria-pressed',st.zones.has(b.dataset.z)));
 document.querySelectorAll('#f-zones .chip[data-g]').forEach(b=>b.setAttribute('aria-pressed',st.groups.has(b.dataset.g)));
 $('#f-listed').setAttribute('aria-pressed',st.listed);
-$('#meta').innerHTML = `Assessment roll 2026 · ${int(DATA.summary.parcels_total)} parcels screened · built ${DATA.generated}`;
+function setHeader(){
+  const c=CITY[st.view];
+  if(st.view==='region'){ const n=CITIES.reduce((a,c)=>a+c.parcels,0);
+    $('#h1').textContent='Metro Vancouver Redevelopment Screener'; $('#eyebrow').textContent='Metro Vancouver · '+CITIES.length+' municipalities · fee-simple parcels · outright zoning';
+    $('#meta').innerHTML=`${int(n)} parcels screened across ${CITIES.map(c=>c.label).join(', ')} · built ${DATA.generated}`;
+  } else {
+    $('#h1').textContent=c.label+' Redevelopment Screener'; $('#eyebrow').textContent=(c.code==='vancouver'?'City of Vancouver':c.label)+' · fee-simple parcels · outright zoning';
+    $('#meta').innerHTML=(c.code==='vancouver'? `Assessment roll 2026 · ${int(c.parcels)} parcels screened` : `${int(c.parcels)} fee-simple parcels (ParcelMap BC) · land values modelled (grade ${c.grade_land}) · zoning grade ${c.grade_zoning}`)+` · built ${DATA.generated}`;
+  }
+  $('#lbl-budget').textContent = vanView()? 'Max assessed value' : 'Max acquisition value';
+}
 
 // ---------- filtering + ranking
 function score(r){ if(st.listed && r.listed && r.ask_profit!=null){ return st.sort==='margin'? r.ask_margin : r.ask_profit; } if(st.sort==='margin') return r.margin; if(st.sort==='rlvx') return r.rlv&&r.assessed? r.rlv/r.assessed : -1; if(st.sort==='best') return Math.max(r.profit, r.toa_profit==null?-Infinity:r.toa_profit); return r.profit; }
 function filtered(){
   const q=st.q.trim().toLowerCase();
-  return rows.filter(r=>
-    (!q || (r.address+' '+r.zone+' '+r.area+' '+(r.postal||'')).toLowerCase().includes(q)) &&
+  return viewRows().filter(r=>
+    (!q || (r.address+' '+r.zone+' '+r.area+' '+(r.postal||'')+' '+((CITY[r.city||'vancouver']||{}).label||'')).toLowerCase().includes(q)) &&
     (!st.budget || r.assessed<=+st.budget) && (!st.area || r.area===st.area) &&
     (st.min==='' || r.site_m2>=+st.min) && (st.max==='' || r.site_m2<=+st.max) &&
     (st.sort==='best' ? Math.max(r.margin, r.toa_margin==null?-1:r.toa_margin)>=st.margin : (st.listed&&r.listed&&r.ask_margin!=null? r.ask_margin : r.margin)>=st.margin) &&
-    st.zones.has(zfam(r.zone)) && st.groups.has(r.group) && (!st.listed || r.listed)
+    st.zones.has(r.fam||'other') && st.groups.has(r.group) && (!st.listed || r.listed)
   ).sort((a,b)=>score(b)-score(a));
 }
 let cur=[];
 function render(){
+  setHeader();
   cur=filtered(); save();
   const top=cur.slice(0,st.shown);
   // KPIs
   const med=a=>{if(!a.length)return null;const s=[...a].sort((x,y)=>x-y);return s[Math.floor(s.length/2)];};
   const t100=cur.slice(0,100);
   const listedN=t100.filter(r=>r.listed).length;
+  const vr=viewRows();
+  const byCity = st.view==='region' ? CITIES.map(c=>c.label.replace('North Vancouver','N. Van')+' '+int(t100.filter(r=>(r.city||'vancouver')===c.code).length)).join(' · ') : null;
   $('#kpis').innerHTML = [
-    ['Sites passing filters', int(cur.length), `of ${int(rows.length)} with a non-negative margin`],
-    ['Median profit, top 100', money(med(t100.map(r=>r.profit))), 'at assessed value ×'+DATA.assumptions.market_over_assessed],
+    ['Sites passing filters', int(cur.length), `of ${int(vr.length)} with a non-negative margin`],
+    ['Median profit, top 100', money(med(t100.map(r=>r.profit))), vanView()? 'at assessed value ×'+DATA.assumptions.market_over_assessed : (st.view==='region'? 'assessed (Vancouver) or modelled lot value' : 'at modelled lot value (HPI × lot size)')],
     ['Median margin, top 100', pct(med(t100.map(r=>r.margin))), `target ≥ ${pct(DATA.assumptions.target_margin)} on cost`],
-    ['Median assessed, top 100', money(med(t100.map(r=>r.assessed))), 'land + improvements, 2026 roll'],
-    ['Listed for sale', int(cur.filter(r=>r.listed).length), listedN? int(listedN)+' in this top 100 · REW.ca, '+DATA.generated : 'none matched in this view'],
+    [vanView()? 'Median assessed, top 100' : 'Median acquisition, top 100', money(med(t100.map(r=>r.assessed))), vanView()? 'land + improvements, 2026 roll' : 'lot value modelled from GVR HPI benchmark'],
+    st.view==='region' ? ['Top 100 by city', int(t100.length), byCity] :
+    ['Listed for sale', int(cur.filter(r=>r.listed).length), listedN? int(listedN)+' in this top 100 · REW.ca, '+DATA.generated : (vanView()? 'none matched in this view' : 'listings only matched for Vancouver')],
   ].map(([l,v,s])=>`<div class="kpi"><div class="eyebrow">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
   // table
   const tb=$('#tbl tbody'); tb.innerHTML='';
@@ -222,19 +248,19 @@ function render(){
     const atAsk = st.listed && r.listed && r.ask_profit!=null;
     const p = basis? r.toa_profit : atAsk? r.ask_profit : r.profit, m = basis? r.toa_margin : atAsk? r.ask_margin : r.margin;
     tr.innerHTML = `<td class="rank num">${i+1}</td>
-      <td class="addr"><strong>${r.address}</strong>${r.listed?'<span class="tag listed">Listed</span>':''}${r.stacked>1?'<span class="tag">'+r.stacked+' parcels</span>':''}<span class="sub">${r.area}${r.postal?' · '+r.postal:''}${r.year_built?' · built '+r.year_built:''}</span></td>
+      <td class="addr"><strong>${r.address}</strong>${r.listed?'<span class="tag listed">Listed</span>':''}${r.stacked>1?'<span class="tag">'+r.stacked+' parcels</span>':''}${!isVan(r)&&(r.land_grade==='D'||r.grade==='D')?'<span class="tag" title="placeholder input, verify">grade D</span>':''}<span class="sub">${st.view==='region'&&CITY[r.city||'vancouver']? CITY[r.city||'vancouver'].label+' · ':''}${r.area}${r.postal?' · '+r.postal:''}${r.year_built?' · built '+r.year_built:''}</span></td>
       <td><span class="dot" style="background:${GCOL[r.group]}"></span>${r.zone}<span class="sub">${basis? r.toa_tier+' · '+r.toa_fsr.toFixed(1)+' FSR rental' : r.fsr.toFixed(2)+' FSR · '+TYPO[r.typology].label}</span></td>
       <td class="r num">${int(r.site_m2)}</td>
-      <td class="r num">${atAsk? money(r.list_price)+'<span class="sub">asking · assessed '+money(r.assessed)+'</span>' : money(r.assessed)}</td>
+      <td class="r num">${atAsk? money(r.list_price)+'<span class="sub">asking · assessed '+money(r.assessed)+'</span>' : money(r.assessed)+(!isVan(r)?'<span class="sub">modelled · '+r.land_grade+'</span>':'')}</td>
       <td class="r num">${int(basis? r.site_m2*10.7639*r.toa_fsr : r.gfa)}</td>
       <td class="r num ${p>=0?'pos':'neg'}">${money(p)}</td>
       <td class="r num ${m>=0?'pos':'neg'}">${pct(m)}</td>
-      <td class="r num">${money(r.rlv)}<span class="sub">${r.rlv&&r.assessed? (r.rlv/r.assessed).toFixed(2)+'× assessed':''}</span></td>`;
+      <td class="r num">${money(r.rlv)}<span class="sub">${r.rlv&&r.assessed? (r.rlv/r.assessed).toFixed(2)+(isVan(r)?'× assessed':'× modelled'):''}</span></td>`;
     tr.addEventListener('click',()=>select(r)); tr.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(r);}});
     tb.appendChild(tr);
   });
   $('#tbl-title').textContent = `Top ${Math.min(st.shown,cur.length)}`+(st.listed?' listed for sale':'');
-  $('#th-price').textContent = st.listed? 'Asking' : 'Assessed';
+  $('#th-price').textContent = st.listed? 'Asking' : (vanView()? 'Assessed' : (st.view==='region'? 'Assessed / modelled' : 'Lot value (modelled)'));
   $('#tbl-sub').textContent = st.sort==='profit'?'ranked by modelled profit': st.sort==='margin'?'ranked by margin on cost': st.sort==='rlvx'?'ranked by max land price ÷ assessed value':'best of outright zoning or TOA rezoning';
   $('#more').hidden = cur.length<=st.shown;
   drawMap(top);
@@ -242,20 +268,29 @@ function render(){
 
 // ---------- map
 const svg=$('#map'); const W=600,H=508;
-const allLon=DATA.areas.flatMap(a=>a.rings.flat().map(p=>p[0])), allLat=DATA.areas.flatMap(a=>a.rings.flat().map(p=>p[1]));
-const lon0=Math.min(...allLon), lon1=Math.max(...allLon), lat0=Math.min(...allLat), lat1=Math.max(...allLat);
-const k=Math.cos(49.25*Math.PI/180); const sx=(W-20)/((lon1-lon0)*k), sy=(H-20)/(lat1-lat0); const s=Math.min(sx,sy);
-const X=lon=>10+(lon-lon0)*k*s, Y=lat=>H-10-(lat-lat0)*s;
 const NS='http://www.w3.org/2000/svg';
 function el(n,a){const e=document.createElementNS(NS,n);for(const q in a)e.setAttribute(q,a[q]);return e;}
 const base=el('g',{}); svg.appendChild(base);
-DATA.areas.forEach(a=>{a.rings.forEach(r=>{const d=r.map((p,i)=>(i?'L':'M')+X(p[0]).toFixed(1)+' '+Y(p[1]).toFixed(1)).join('')+'Z';const p=el('path',{d,fill:'var(--surface-2)',stroke:'var(--bg)','stroke-width':1.2});p.appendChild(Object.assign(document.createElementNS(NS,'title'),{textContent:a.name}));base.appendChild(p);});
-  const pts=a.rings[0]; const cx=pts.reduce((q,p)=>q+X(p[0]),0)/pts.length, cy=pts.reduce((q,p)=>q+Y(p[1]),0)/pts.length;
-  if(a.rings[0].length>8){const t=el('text',{x:cx,y:cy,'text-anchor':'middle','font-size':8,fill:'var(--muted)','font-family':'IBM Plex Sans, sans-serif'});t.textContent=a.name.replace('Kensington-Cedar Cottage','Kensington-C.C.').replace('Renfrew-Collingwood','Renfrew-Coll.').replace('Dunbar-Southlands','Dunbar').replace('Grandview-Woodland','Grandview').replace('Victoria-Fraserview','Vic-Fraserview');base.appendChild(t);}});
-DATA.stations.forEach(z=>base.appendChild(el('rect',{x:X(z.lon)-2.5,y:Y(z.lat)-2.5,width:5,height:5,fill:'var(--muted)',rx:1})));
 const dots=el('g',{}); svg.appendChild(dots);
 const tip=$('#tip');
+let X=()=>0, Y=()=>0, mapView=null;
+function buildMap(){
+  if(mapView===st.view) return; mapView=st.view; base.innerHTML='';
+  const areas=DATA.areas.filter(a=>st.view==='region' || (a.city||'vancouver')===st.view);
+  const allLon=areas.flatMap(a=>a.rings.flat().map(p=>p[0])), allLat=areas.flatMap(a=>a.rings.flat().map(p=>p[1]));
+  const lon0=Math.min(...allLon), lon1=Math.max(...allLon), lat0=Math.min(...allLat), lat1=Math.max(...allLat);
+  const k=Math.cos(49.25*Math.PI/180); const sx=(W-20)/((lon1-lon0)*k), sy=(H-20)/(lat1-lat0); const s=Math.min(sx,sy);
+  const ox=(W-(lon1-lon0)*k*s)/2, oy=(H-(lat1-lat0)*s)/2;
+  X=lon=>ox+(lon-lon0)*k*s; Y=lat=>H-oy-(lat-lat0)*s;
+  areas.forEach(a=>{a.rings.forEach(r=>{const d=r.map((p,i)=>(i?'L':'M')+X(p[0]).toFixed(1)+' '+Y(p[1]).toFixed(1)).join('')+'Z';const p=el('path',{d,fill:'var(--surface-2)',stroke:'var(--bg)','stroke-width':1.2});p.appendChild(Object.assign(document.createElementNS(NS,'title'),{textContent:a.name}));base.appendChild(p);});
+    const pts=a.rings[0]; const cx=pts.reduce((q,p)=>q+X(p[0]),0)/pts.length, cy=pts.reduce((q,p)=>q+Y(p[1]),0)/pts.length;
+    const isCity=(a.city||'vancouver')!=='vancouver';
+    if(a.rings[0].length>8 && (st.view!=='region' || isCity)){const t=el('text',{x:cx,y:cy,'text-anchor':'middle','font-size':isCity?9:8,fill:'var(--muted)','font-family':'IBM Plex Sans, sans-serif'});t.textContent=a.name.replace('Kensington-Cedar Cottage','Kensington-C.C.').replace('Renfrew-Collingwood','Renfrew-Coll.').replace('Dunbar-Southlands','Dunbar').replace('Grandview-Woodland','Grandview').replace('Victoria-Fraserview','Vic-Fraserview');base.appendChild(t);}});
+  if(st.view==='region'){const t=el('text',{x:X(-123.12),y:Y(49.25),'text-anchor':'middle','font-size':9,fill:'var(--muted)','font-family':'IBM Plex Sans, sans-serif'});t.textContent='Vancouver';base.appendChild(t);}
+  DATA.stations.forEach(z=>{ if(X(z.lon)<0||X(z.lon)>W||Y(z.lat)<0||Y(z.lat)>H) return; base.appendChild(el('rect',{x:X(z.lon)-2.5,y:Y(z.lat)-2.5,width:5,height:5,fill:'var(--muted)',rx:1}));});
+}
 function drawMap(top){
+  buildMap();
   dots.innerHTML='';
   const maxP=Math.max(1,...top.map(r=>Math.max(r.profit,r.toa_profit||0)));
   [...top].reverse().forEach((r,ri)=>{ if(r.lat==null) return;
@@ -273,11 +308,12 @@ function drawMap(top){
 // ---------- detail
 function select(r){
   st.sel=r; const d=$('#detail'); d.hidden=false;
-  const parts=[['Acquisition (assessed ×'+DATA.assumptions.market_over_assessed+', PTT, demo, carry)',r.acquisition],['Hard construction',r.hard],['Soft costs',r.soft],['Levies, DCCs & inclusionary',r.levies]];
+  const van=isVan(r); const cl=(CITY[r.city||'vancouver']||{}).label||'Vancouver';
+  const parts=[[van?'Acquisition (assessed ×'+DATA.assumptions.market_over_assessed+', PTT, demo, carry)':'Acquisition (modelled lot value, PTT, demo, carry)',r.acquisition],['Hard construction',r.hard],['Soft costs',r.soft],['Levies, DCCs & inclusionary',r.levies]];
   const cols=['var(--ink-2)','var(--line-2)','var(--muted)','var(--warn)'];
   const gm=`https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lon}`;
-  const bca=`https://www.bcassessment.ca/Property/Search/GetByAddress?addr=${encodeURIComponent(r.address+' Vancouver')}`;
-  d.innerHTML=`<div class="hd"><h2>${r.address}<span class="sub" style="font-family:'IBM Plex Sans';font-weight:400">${r.area} · ${r.zone} · PID ${r.pid}${r.stacked>1?' (+'+(r.stacked-1)+' stacked parcels)':''}</span></h2><button class="btn" id="close">Close</button></div>
+  const bca=`https://www.bcassessment.ca/Property/Search/GetByAddress?addr=${encodeURIComponent(r.address+' '+cl)}`;
+  d.innerHTML=`<div class="hd"><h2>${r.address}<span class="sub" style="font-family:'IBM Plex Sans';font-weight:400">${van?'':cl+' · '}${r.area} · ${r.zone} · PID ${r.pid}${r.stacked>1?' (+'+(r.stacked-1)+' stacked parcels)':''}</span></h2><button class="btn" id="close">Close</button></div>
   <div class="body">
     <div>
       <div class="eyebrow">Development option under current zoning</div>
@@ -285,12 +321,14 @@ function select(r){
         <div>Site</div><div class="num">${int(r.site_m2)} m² (${int(r.site_m2*10.7639)} sf)</div>
         <div>Permitted</div><div class="num">${r.fsr.toFixed(2)} FSR · ${TYPO[r.typology].label}${r.storeys?' · '+r.storeys+' st':''}</div>
         <div>Buildable / saleable</div><div class="num">${int(r.gfa)} / ${int(r.gfa*TYPO[r.typology].eff)} sf · ~${r.units} units</div>
-        <div>Assessed 2026</div><div class="num">${money(r.assessed)} <span class="sub">land ${money(r.land)} · bldg ${money(r.improvement)}${r.year_built?' ('+r.year_built+')':''}</span></div>
+        ${van? `<div>Assessed 2026</div><div class="num">${money(r.assessed)} <span class="sub">land ${money(r.land)} · bldg ${money(r.improvement)}${r.year_built?' ('+r.year_built+')':''}</span></div>`
+             : `<div>Lot value (modelled)</div><div class="num">${money(r.assessed)} <span class="sub">GVR HPI benchmark × (lot ÷ typical lot)<sup>0.55</sup>${r.land_grade==='D'?' · apartment land at $/buildable sf':''} · grade ${r.land_grade}${r.year_built?' · built '+r.year_built:''}</span></div>
+                <div>Zoning rule grade</div><div class="num">${GRADE_TXT[r.grade]||r.grade}</div>`}
         <div>Land cost per buildable sf</div><div class="num">$${int(r.land_psf_buildable)}</div>
         <div>Nearest SkyTrain</div><div class="num">${r.station} · ${int(r.station_m)} m</div>
       </div>
       ${r.note?`<p class="meta" style="margin:10px 0 0">${r.note}</p>`:''}
-      ${r.toa_tier?`<p style="margin:10px 0 0;padding:8px 10px;border-radius:6px;background:var(--surface-2);font-size:12.5px"><strong>TOA rezoning upside:</strong> ${r.toa_tier}, ${r.toa_fsr.toFixed(1)} FSR secured rental → modelled profit ${money(r.toa_profit)} (${pct(r.toa_margin)}). Requires a rezoning application; not outright.</p>`:''}
+      ${r.toa_tier?`<p style="margin:10px 0 0;padding:8px 10px;border-radius:6px;background:var(--surface-2);font-size:12.5px"><strong>TOA rezoning upside:</strong> ${r.toa_tier}, ${r.toa_fsr.toFixed(1)} FSR ${van?'secured rental':'strata with the city\'s inclusionary share'} → modelled profit ${money(r.toa_profit)} (${pct(r.toa_margin)}). Requires a rezoning application; not outright.</p>`:''}
       ${r.existing_apt?`<p class="meta">Flagged: likely an existing apartment building — rental-replacement and tenant-relocation policies would apply.</p>`:''}
       <p class="links" style="margin:12px 0 0"><a href="${gm}" target="_blank" rel="noopener">Open in Google Maps</a><a href="${bca}" target="_blank" rel="noopener">BC Assessment</a>${r.listed&&r.listing_url?`<a href="${r.listing_url}" target="_blank" rel="noopener">Listing${r.list_price?' · '+money(r.list_price):''}</a>`:''}</p>
     </div>
@@ -303,7 +341,7 @@ function select(r){
         <div class="tot">Total cost</div><div class="num tot">${money(r.cost)}</div>
         <div class="tot">Profit · margin on cost</div><div class="num tot ${r.profit>=0?'pos':'neg'}">${money(r.profit)} · ${pct(r.margin)}</div>
         ${r.listed&&r.ask_profit!=null?`<div class="tot">At asking price ${money(r.list_price)}</div><div class="num tot ${r.ask_profit>=0?'pos':'neg'}">${money(r.ask_profit)} · ${pct(r.ask_margin)}</div>`:''}
-        <div>Max land price for a ${pct(DATA.assumptions.target_margin)} margin</div><div class="num">${money(r.rlv)} <span class="sub">${r.rlv&&r.assessed?(r.rlv/r.assessed).toFixed(2)+'× assessed':''}</span></div>
+        <div>Max land price for a ${pct(DATA.assumptions.target_margin)} margin</div><div class="num">${money(r.rlv)} <span class="sub">${r.rlv&&r.assessed?(r.rlv/r.assessed).toFixed(2)+(van?'× assessed':'× modelled value'):''}</span></div>
       </div>
     </div>
   </div>`;
@@ -321,10 +359,12 @@ $('#notes').innerHTML=`
 <p><strong>Costs.</strong> Acquisition at ${A.market_over_assessed}× the 2026 BC Assessment total plus property transfer tax, 1% closing, $60k demolition and 18 months of carry at 6.5%. Hard costs all-in: ${Object.values(A.typologies).map(t=>t.label.split(' (')[0]+' $'+t.hard).join(', ')} per buildable sf (Altus 2026 ranges plus parking and site work); soft costs ${Math.round(A.soft_pct*100)}% of hard. City DCL $${A.dcl.le_1_2}/$${A.dcl.le_1_5}/$${A.dcl.gt_1_5} per sf by FSR tier (Dec 2025 rates), Amenity Cost Charge $${A.acc.le_1_2}/$${A.acc.le_1_5}/$${A.acc.gt_1_5} (effective Sept 30 2026), Metro Vancouver and TransLink DCCs per unit, and the cash-in-lieu inclusionary rates for RM-8A and west-side R1-1 large lots.</p>
 <p><strong>Screened out</strong>: strata lots, tax-exempt parcels (parks, schools, churches, government), sites under ${A.filters.min_site_m2} m² or over ${int(A.filters.max_site_m2)} m², parcels whose assessed land value is implausibly low for their area (leaseholds, co-ops, partial interests), buildings newer than ${A.filters.year_built_cutoff} worth more than ${Math.round(A.filters.max_improvement_to_land_ratio*100)}% of their land, and RM/R3/R5 sites that look like existing apartment buildings (rental replacement applies). CD-1, DD, industrial and historic-area districts have no outright residential formula and are not scored.</p>
 <p><strong>Read the results as a screen, not an appraisal.</strong> Assessed values lag the market and owners of well-located commercial sites ask far more than assessment — which is exactly why C-2 corridor sites float to the top. The "max land price" column is the more useful number for negotiating: it is the purchase price that still leaves a ${pct(A.target_margin)} margin on cost. Frontage is estimated from area (RM-9/10/11 thresholds), heritage, view cones, soils and tenant relocation are not modelled, and every price and cost input is editable in <code>assumptions.json</code>.</p>
-<p class="meta">Data: City of Vancouver Open Data (property tax report 2026, parcel polygons, rapid transit stations, local area boundaries), CC-BY 4.0. Zoning schedules and levies as of September 2026.</p>`;
+${multi?`<p><strong>Other municipalities (Burnaby, Richmond, New Westminster, North Vancouver City and District).</strong> Vancouver is the only Metro city that publishes BC Assessment values as open data, so for the other cities the acquisition price is <em>modelled</em>: the September 2026 GVR MLS HPI benchmark detached price for the sub-area, scaled by (lot area ÷ the city's typical lot)<sup>0.55</sup> — the lot-size elasticity fitted on Vancouver's own roll — and, for pre-zoned apartment or commercial land, never less than a market $/buildable-sf. Parcels come from ParcelMap BC (and each city's open parcel layer where one exists), zoning from each city's open zoning layer (Richmond has none: a c.2020 academic zoning map is remapped to the 2024 RSM pre-zoning). Entitlements follow each bylaw as of mid-2026: Burnaby's height-based R1–R8 districts (no FSR; floor area derived from storeys, coverage and floorplate caps), Richmond RSM (non-stratifiable multiplex at ~0.6 FSR), New Westminster RGO-A/B infill and RT-A/B townhouse pre-zoning, the City of North Vancouver's GO and MID zones, and the District's R2 house-plus-coach-house formula (Council declined SSMUH in April 2026). Fees use each city's DCC / ACC / SSAC schedules plus Metro Vancouver and TransLink DCCs. Every row carries a grade (A bylaw text, B city bulletin, C derived, D placeholder) on its zoning rule and land value; treat D-grade rows as prompts to check, not findings.</p>`:''}
+<p class="meta">Data: City of Vancouver Open Data (property tax report 2026, parcel polygons, rapid transit stations, local area boundaries), CC-BY 4.0${multi?'; ParcelMap BC and municipal open data (Burnaby, New Westminster, North Vancouver City and District) under their Open Government Licences; GVR MLS HPI September 2026':''}. Zoning schedules and levies as of September–November 2026.</p>`;
 
 // ---------- events
 const on=(sel,ev,fn)=>$(sel).addEventListener(ev,fn);
+on('#f-view','change',e=>{st.view=e.target.value;st.shown=100;st.sel=null;$('#detail').hidden=true;fillAreas();render();});
 on('#f-q','input',e=>{st.q=e.target.value;st.shown=100;render();});
 on('#f-budget','change',e=>{st.budget=e.target.value;st.shown=100;render();});
 on('#f-area','change',e=>{st.area=e.target.value;st.shown=100;render();});
