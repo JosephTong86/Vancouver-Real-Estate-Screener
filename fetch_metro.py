@@ -41,6 +41,22 @@ DWV = "https://dwvmaps.westvancouver.ca/server/rest/services"
 LCITY = "https://maps.langleycity.ca/server/rest/services/Maps/Open_Data/MapServer"
 TOL = "https://mapsvr.tol.ca/arcgisext02/rest/services/GeoSource/DynamicServices/MapServer"
 MRIDGE = "https://geoservices.mapleridge.ca/server/rest/services/DataCatalog"
+ABBY = "https://services8.arcgis.com/ZYlQy38aWlfDG1Qh/arcgis/rest/services"
+WHIS = "https://webmap.whistler.ca/server/rest/services"
+CRD = "https://mapservices.crd.bc.ca/arcgis/rest/services/Properties/MapServer/2"
+VIC = "https://maps.victoria.ca/server/rest/services/OpenData"
+SAAN = "https://map.saanich.ca/server/rest/services/MAPS/SaanichMapService_External/MapServer"
+ESQ = "https://gis.esquimalt.ca/arcgis/rest/services/Services"
+LANG = "https://arcex.langford.ca/server/rest/services/Parcel_Info_Map/Parcel_Info_Webmap_EB/MapServer"
+COLW = "https://services3.arcgis.com/MLf7r3NQY1Pb8feC/arcgis/rest/services"
+
+
+def crd_base(jur_codes, label):
+    """Capital Regional District regional lot fabric (PID, address, owner type) filtered to one BC Assessment jurisdiction."""
+    codes = ",".join(f"'{c}'" for c in jur_codes)
+    return dict(url=CRD, where=f"BCAJurisdiction IN ({codes}) AND ParcelClass='SUBDIVISION'", page=3000, skip_pmbc=True,
+                fields=["PID", "FullAddress", "OwnerType", "ParcelClass", "BCAJurisdiction", "UnitNumber"],
+                map=dict(pid="PID", address="FullAddress", owner_type_src="OwnerType", flags=[("UnitNumber", "strata_unit", "nonempty")]))
 
 # ------------------------------------------------------------------ city configs
 # base: None -> ParcelMap BC (pmbc LIKE pattern). Otherwise an ArcGIS layer with a field map:
@@ -101,11 +117,14 @@ CITIES = {
                             fields=["PID", "CIVIC_ADDRESS", "ZONING", "OCPDES", "GRND_AREA", "ALR", "FLOODPLN", "SCOTTSDALE", "SSMUHUNITAREA", "HERITAGE_REG_CODE", "UNITNUM"],
                             map=dict(pid="PID", address="CIVIC_ADDRESS", zone="ZONING", ocp="OCPDES", heritage="HERITAGE_REG_CODE",
                                      ftn=("SSMUHUNITAREA", "nonempty"), flags=[("ALR", "alr", "Y"), ("FLOODPLN", "floodplain", "Y"), ("SCOTTSDALE", "scottsdale", "Y"), ("UNITNUM", "strata_unit", "nonempty")]))),
+    # DWV's parcel service sits behind a Cloudflare challenge (HTTP 403 to non-browser clients, 4 Nov 2026): zoning comes from the
+    # MountainMath aggregate (West Vancouver's RS / RD / RM map has barely changed since 2020); the DWV join is attempted for addresses
     "westvan": dict(label="West Vancouver", pmbc="West Vancouver%",
-                    base=dict(url=DWV + "/Cadastral/PublishedService_ParcelsExternal/MapServer/0", where="1=1",
-                              fields=["PID", "ADDRESS", "ZONING_DESIGNATION", "LAND_USE_DESIGNATION", "DATE_BUILT", "ACTUAL_USE_DESC", "NEIGHBOURHOOD_DESC"],
-                              map=dict(pid="PID", address="ADDRESS", zone="ZONING_DESIGNATION", ocp="LAND_USE_DESIGNATION", year_built="DATE_BUILT",
-                                       landuse="ACTUAL_USE_DESC", neighbourhood="NEIGHBOURHOOD_DESC"), optional=True)),
+                    zoning=dict(kind="mountainmath", url="https://s3.ca-central-1.amazonaws.com/mountainmath/cmhc/metro_van_zoning_aggregate.geojson.gz", muni="West Vancouver"),
+                    extras=[dict(kind="pid_join", url=DWV + "/Cadastral/PublishedService_ParcelsExternal/MapServer/0",
+                                 fields=["PID", "ADDRESS", "ZONING_DESIGNATION", "LAND_USE_DESIGNATION", "DATE_BUILT", "ACTUAL_USE_DESC", "NEIGHBOURHOOD_DESC"], pid_field="PID",
+                                 map=dict(address="ADDRESS", zone="ZONING_DESIGNATION", ocp="LAND_USE_DESIGNATION", year_built="DATE_BUILT",
+                                          landuse="ACTUAL_USE_DESC", neighbourhood="NEIGHBOURHOOD_DESC"), geometry=False)]),
     "langleycity": dict(label="Langley City", pmbc="Langley, City%",
                         zoning=dict(kind="arcgis", url=LCITY + "/90", fields=["ZONING", "CD_NMBR"], map=dict(zone="ZONING", zcat="CD_NMBR")),
                         extras=[dict(kind="pip_points", url=LCITY + "/182", fields=["FULL_ADD"], map=dict(address="FULL_ADD"))]),
@@ -116,6 +135,54 @@ CITIES = {
                        zoning=dict(kind="arcgis", url=MRIDGE + "/PlanningDevelopment/MapServer/6", fields=["ZoningCode", "Category"], map=dict(zone="ZoningCode", zcat="Category")),
                        extras=[dict(kind="pip", url=MRIDGE + "/Property/MapServer/3", fields=["Address", "StreetName"], map=dict(address=("Address", "StreetName"))),
                                dict(kind="pip", url=MRIDGE + "/PlanningDevelopment/MapServer/5", fields=["OBJECTID"], map=dict(flags=[("OBJECTID", "urban_area", "nonempty")]))]),
+    # ---- batch 3: Fraser Valley, Sea-to-Sky, Capital Region
+    # Abbotsford's parcel layer carries zoning, OCP and the BC Assessment land / improvement values (grade A land values)
+    "abbotsford": dict(label="Abbotsford", pmbc="Abbotsford%",
+                       base=dict(url=ABBY + "/Parcel_Layers_External_Feature/FeatureServer/0", where="1=1",
+                                 fields=["PID", "PROP_ADDRESS", "ZONING", "OCP_LandUse", "UDA", "ALR", "FLOODPLN", "LAND_VALUE", "IMP_VALUE", "TTL_VALUE", "USE_DESC", "HAP", "LUC"],
+                                 map=dict(pid="PID", address="PROP_ADDRESS", zone="ZONING", ocp="OCP_LandUse", landuse="USE_DESC", heritage="HAP",
+                                          land_value="LAND_VALUE", improvement_value="IMP_VALUE",
+                                          flags=[("UDA", "urban_area", "Y"), ("ALR", "alr", "Y"), ("FLOODPLN", "floodplain", "Y"), ("LUC", "luc", "nonempty")]))),
+    # Whistler's parcel layer carries the zone; SSMUH dwelling-count polygons give the 3/4-unit eligibility
+    "whistler": dict(label="Whistler", pmbc="Whistler%",
+                     base=dict(url=WHIS + "/ExternalVS/Parcels/MapServer/0", where="LegalDescription NOT LIKE 'STRATA LOT%'",
+                               fields=["PID", "FOLIOADRSS", "ZONING1", "ZONETYPE1", "LegalDescription"],
+                               map=dict(pid="PID", address="FOLIOADRSS", zone="ZONING1", zcat="ZONETYPE1")),
+                     extras=[dict(kind="pip", url=WHIS + "/ExternalVS/Land_Use/MapServer/4", fields=["Source"],
+                                  map=dict(flags=[("Source", "ssmuh4", "4 Dwelling Units"), ("Source", "ssmuh3", "3 Dwelling Units")]))]),
+    "victoria": dict(label="Victoria", pmbc="Victoria, City%",
+                     base=crd_base(["234"], "Victoria"),
+                     zoning=dict(kind="arcgis", url=VIC + "/OpenData_PlanningAndDevelopment/MapServer/12", fields=["Zoning", "ZoningBylaw"], map=dict(zone="Zoning", zcat="ZoningBylaw")),
+                     extras=[dict(kind="pid_join", url="https://services.arcgis.com/EHSKalEvBxdO9ljW/arcgis/rest/services/Property_Assessment_Report_2026/FeatureServer/0",
+                                  fields=["PID", "land_gross", "impr_gross", "LEGAL_TYPE", "assess_abbreviation"], pid_field="PID", where="LEGAL_TYPE='LAND'",
+                                  map=dict(land_value="land_gross", improvement_value="impr_gross", landuse="assess_abbreviation"), geometry=False),
+                             dict(kind="pip", url=VIC + "/OpenData_PlanningAndDevelopment/MapServer/10", fields=["OBJECTID"], map=dict(flags=[("OBJECTID", "heritage", "nonempty")]))]),
+    "saanich": dict(label="Saanich", pmbc="Saanich, The%",
+                    base=crd_base(["308", "309", "389"], "Saanich"),
+                    zoning=dict(kind="arcgis", url=SAAN + "/28", fields=["ZONINGTYPE", "ZONINGCLASSIFICATION"], map=dict(zone="ZONINGTYPE", zcat="ZONINGCLASSIFICATION"), page=3000),
+                    extras=[dict(kind="pip", url=SAAN + "/128", fields=["OBJECTID"], map=dict(ftn=("OBJECTID", "nonempty")), page=3000),
+                            dict(kind="pip", url=SAAN + "/11", fields=["OBJECTID"], map=dict(flags=[("OBJECTID", "urban_area", "nonempty")]), page=3000),
+                            dict(kind="pip", url=SAAN + "/10", fields=["OBJECTID"], map=dict(flags=[("OBJECTID", "alr", "nonempty")]), page=3000),
+                            dict(kind="pip", url=SAAN + "/134", fields=["LANDUSE"], map=dict(ocp="LANDUSE"), page=3000)]),
+    # Oak Bay publishes no zoning layer: private lots are treated as RS (single-family) — the whole district outside the
+    # Oak Bay Avenue / Estevan villages is zoned RS-1..RS-5 (zoning grade D)
+    "oakbay": dict(label="Oak Bay", pmbc="Oak Bay%", base=crd_base(["317"], "Oak Bay"), assume_zone="RS"),
+    "esquimalt": dict(label="Esquimalt", pmbc="Esquimalt%",
+                      base=crd_base(["307"], "Esquimalt"),
+                      zoning=dict(kind="arcgis", url=ESQ + "/Zoning/MapServer/0", fields=["Zone", "Zone_Description"], map=dict(zone="Zone", zcat="Zone_Description"), page=1000),
+                      extras=[dict(kind="pid_join", url=ESQ + "/RSM/MapServer/0", fields=["PID"], pid_field="PID", map=dict(flags=[("PID", "rsm1", "nonempty")]), geometry=False)]),
+    # Langford's parcel layer carries zoning and the BC Assessment values
+    "langford": dict(label="Langford", pmbc="Langford%",
+                     base=dict(url=LANG + "/10", where="1=1", fields=["PID", "Full_Address", "ZONE_ABR", "ZONE_DESC", "LandValue", "ImprovementsValue", "Parcel_Feature"],
+                               map=dict(pid="PID", address="Full_Address", zone="ZONE_ABR", zcat="ZONE_DESC", land_value="LandValue", improvement_value="ImprovementsValue", landuse="Parcel_Feature")),
+                     extras=[dict(kind="pip", url=LANG + "/30", fields=["OCP_DES"], map=dict(ocp="OCP_DES"))]),
+    "colwood": dict(label="Colwood", pmbc="Colwood%",
+                    base=dict(url=COLW + "/mapParcel/FeatureServer/0", where="ParcelType='SUBDIVISION'",
+                              fields=["PID", "Address", "OwnerType", "Category", "SubCategory", "Neighbourhood"],
+                              map=dict(pid="PID", address="Address", owner_type_src="OwnerType", landuse="SubCategory", neighbourhood="Neighbourhood")),
+                    zoning=dict(kind="arcgis", url=COLW + "/mapZoning/FeatureServer/1", fields=["ZoneCode", "ZoneName"], map=dict(zone="ZoneCode", zcat="ZoneName"))),
+    # View Royal publishes only a PDF zoning map: private lots are treated as R1 (zoning grade D)
+    "viewroyal": dict(label="View Royal", pmbc="View Royal%", base=crd_base(["401", "402"], "View Royal"), assume_zone="R1"),
 }
 
 STATIONS_URL = "https://services3.arcgis.com/A7O8YnTNtzRPIn7T/arcgis/rest/services/Skytrain_Station_Pts/FeatureServer/0"
@@ -139,6 +206,16 @@ EXTRA_STATIONS = [
     {"station": "Clayton (2029)", "lat": 49.122, "lon": -122.6969, "kind": "skytrain"},
     {"station": "Willowbrook (2029)", "lat": 49.11389, "lon": -122.67917, "kind": "skytrain"},
     {"station": "Langley City Centre (2029)", "lat": 49.10639, "lon": -122.65972, "kind": "skytrain"},
+    # B.C. Reg. 263/2023 Schedule bus exchanges outside Metro Vancouver (Table 4-5 item 2: 3.5 / 2.5 FAR; Whistler item 3: 2.5 / 1.5)
+    {"station": "Bourquin Exchange", "lat": 49.048239, "lon": -122.308918, "kind": "bus_bc"},
+    {"station": "Gondola Exchange", "lat": 50.113152, "lon": -122.951658, "kind": "bus_whistler"},
+    {"station": "Legislature Exchange", "lat": 48.418889, "lon": -123.368939, "kind": "bus_bc"},
+    {"station": "Uptown Exchange", "lat": 48.455942, "lon": -123.377227, "kind": "bus_bc"},
+    {"station": "Royal Oak Exchange", "lat": 48.499054, "lon": -123.388041, "kind": "bus_bc"},
+    {"station": "UVic Exchange", "lat": 48.466114, "lon": -123.308532, "kind": "bus_bc"},
+    {"station": "Colwood Exchange", "lat": 48.445168, "lon": -123.466447, "kind": "bus_bc"},
+    {"station": "Langford Exchange", "lat": 48.445454, "lon": -123.505016, "kind": "bus_bc"},
+    {"station": "VGH Exchange", "lat": 48.466224, "lon": -123.435007, "kind": "bus_bc"},
 ]
 STATIONS_FALLBACK = [
     ("Patterson", 49.22967, -123.012376), ("Metrotown", 49.225463, -123.003182), ("Royal Oak", 49.220004, -122.988381),
@@ -330,6 +407,14 @@ def apply_map(row, attrs, mp):
             continue
         if k == "address":
             row["address"] = str(v).title()
+        elif k == "heritage":
+            if str(v).strip().upper() not in ("N", "NO", "0", "FALSE", "NONE"):
+                row["heritage"] = str(v).strip()
+        elif k in ("land_value", "improvement_value"):
+            try:
+                row[k] = float(v)
+            except Exception:
+                pass
         elif k == "strata":
             row["strata"] = str(v).strip().upper() in ("Y", "YES", "1", "TRUE", "STRATA")
         elif k == "year_built":
@@ -389,7 +474,11 @@ def nearest_station(st, lat, lon, kinds=("skytrain", "bus")):
 def new_row(city):
     return dict(city=city, pid="", address="", zone="", overlay="", zcat="", ocp="", site_m2=0.0, frontage_m=None, lat=None, lon=None,
                 parcel_class="Subdivision", owner_type="Unknown", strata=False, year_built=None, existing_fsr=None, neighbourhood="",
-                landuse="", heritage="", ftn=False, flags=set(), mslink=None)
+                landuse="", heritage="", ftn=False, flags=set(), mslink=None, land_value=None, improvement_value=None)
+
+
+OWNER_NORM = {"PRIVATE": "Private", "MUNICIPAL": "Local Government", "LOCAL GOVERNMENT": "Local Government", "CROWN PROVINCIAL": "Crown Provincial",
+              "CROWN FEDERAL": "Crown Federal", "CROWN AGENCY": "Crown Agency", "FIRST NATION": "First Nation", "MIXED OWNERSHIP": "Mixed Ownership"}
 
 
 def fetch_pmbc(city, cfg):
@@ -413,10 +502,11 @@ def fetch_base(city, cfg):
     """City parcel layer as the base (carries zoning etc.); ParcelMap BC joined on PID for parcel class / owner type."""
     b = cfg["base"]
     pm = {}
-    try:
-        pm = {r["pid"]: r for r in fetch_pmbc(city, cfg)}
-    except Exception as e:
-        print("  PMBC join unavailable:", e)
+    if not b.get("skip_pmbc"):
+        try:
+            pm = {r["pid"]: r for r in fetch_pmbc(city, cfg)}
+        except Exception as e:
+            print("  PMBC join unavailable:", e)
     rows = []
     for f in arcgis_pages(b["url"], b["fields"], where=b.get("where", "1=1"), page=b.get("page", 2000)):
         g = f.get("geometry")
@@ -432,7 +522,9 @@ def fetch_base(city, cfg):
         if not same_site:
             r["frontage_m"] = None; r["existing_fsr"] = None
         p = pm.get(r["pid"], {})
-        r.update(site_m2=area, lat=c.y, lon=c.x, parcel_class=p.get("parcel_class", "Subdivision"), owner_type=p.get("owner_type", "Unknown"), _geom=geom)
+        src_owner = str(r.pop("owner_type_src", "") or "").strip().upper()
+        owner = p.get("owner_type") or OWNER_NORM.get(src_owner, src_owner.title() if src_owner else "Unknown")
+        r.update(site_m2=area, lat=c.y, lon=c.x, parcel_class=p.get("parcel_class", "Subdivision"), owner_type=owner, _geom=geom)
         if "strata_unit" in r["flags"]:
             r["strata"] = True
         rows.append(r)
@@ -583,6 +675,13 @@ def assemble_city(city, stations):
             zsrc = join_zoning(city, cfg, rows)
         except Exception as e:
             print(f"  zoning join failed for {city}: {e}")
+        if cfg.get("assume_zone"):
+            n = 0
+            for r in rows:
+                if not r.get("zone") and r.get("owner_type") in ("Private", "Unknown") and 200 <= r["site_m2"] <= 4050:
+                    r["zone"] = cfg["assume_zone"]; n += 1
+            zsrc = f"assumed {cfg['assume_zone']} (no open zoning layer)"
+            print(f"  zone assumed {cfg['assume_zone']} on {n:,} private lots")
         for ex in cfg.get("extras", []):
             try:
                 run_extra(city, cfg, rows, ex)
@@ -593,7 +692,7 @@ def assemble_city(city, stations):
         best = nearest_station(stations, r["lat"], r["lon"], kinds) if kinds else None
         no_toa = best is None
         if no_toa:
-            best = nearest_station(stations, r["lat"], r["lon"])
+            best = nearest_station(stations, r["lat"], r["lon"], kinds=tuple({s["kind"] for s in stations}))
         s, d = best
         r["nearest_station"] = s["station"]; r["station_dist_m"] = round(d); r["station_kind"] = "none" if no_toa else s["kind"]
         r["zoning_source"] = zsrc
@@ -608,7 +707,7 @@ def assemble_city(city, stations):
             print("  boundary hull failed:", e)
     cols = ["city", "pid", "address", "zone", "overlay", "zcat", "ocp", "site_m2", "frontage_m", "lat", "lon", "parcel_class", "owner_type",
             "strata", "year_built", "existing_fsr", "neighbourhood", "landuse", "heritage", "ftn", "flags", "nearest_station", "station_dist_m",
-            "station_kind", "zoning_source"]
+            "station_kind", "zoning_source", "land_value", "improvement_value"]
     path = os.path.join(OUT, f"{city}.csv")
     with open(path, "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=cols, extrasaction="ignore")

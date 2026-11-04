@@ -18,6 +18,8 @@ METRO_DCC = {
     "fraser": {"townhouse": 20296, "apartment": 14396},
     "nshore": {"townhouse": 19277, "apartment": 13099},
     "lulu":   {"townhouse": 15208, "apartment": 10610},
+    # outside Metro Vancouver: no regional DCC; the Capital Regional District's sewer / water DCCs are folded into the city fees below
+    "none":   {"townhouse": 0, "apartment": 0},
 }
 TRANSLINK = {"townhouse": 2837, "apartment": 1774}
 PERMITS_MISC_PER_UNIT = 6000
@@ -174,6 +176,96 @@ CITIES = {
         "inclusionary_toa": 0.0,
         "grade_land": "C", "grade_zoning": "C",
     },
+    # ---------------------------------------------------------------- batch 3 (research 4 Nov 2026): Fraser Valley, Sea-to-Sky, Capital Region
+    "abbotsford": {
+        "label": "Abbotsford", "metro": "none", "hard_factor": 0.85,
+        # BC Assessment land + improvement values come on the city's parcel layer (grade A); HPI only as a fallback (FVREB Oct 2026, B)
+        "hpi_detached": {"Abbotsford": 1150000, "Abbotsford West": 1050000, "Abbotsford East": 1250000},
+        "prices": {"Abbotsford": [500, 600, 650], "Abbotsford West": [480, 580, 620], "Abbotsford East": [520, 620, 660]},   # (E) presale condo $550-650/sf
+        "land_bsf": {"woodframe": 70, "midrise": 50, "tower": 40},   # (E)
+        # (A) DCC Bylaw 3633-2025 + ACC Bylaw 3637-2025 (eff. 1 Feb 2026), totals per unit incl. ACC and SSAC: SFD 64,860; duplex 40,497; townhouse 31,743; apartment 20,423
+        "fees": {"duplex": 40497, "multiplex": 31743, "townhouse": 31743, "woodframe": 20423, "midrise": 20423, "tower": 20423},
+        "inclusionary_toa": 0.0,
+        "grade_land": "A", "grade_zoning": "B",
+    },
+    "whistler": {
+        "label": "Whistler", "metro": "none", "hard_factor": 1.15,   # mountain construction premium
+        "hpi_detached": {"Whistler": 3050000, "Whistler Village": 3400000, "Whistler South": 2600000},   # (E) REBGV HPI Whistler detached ~$3.0M (Sep 2026)
+        "prices": {"Whistler": [1500, 1700, 1800], "Whistler Village": [1800, 2000, 2100], "Whistler South": [1300, 1500, 1600]},   # (E) new product $1,500-2,000/sf
+        "land_bsf": {"woodframe": 400, "midrise": 350, "tower": 300},   # (E)
+        "employee_value_factor": 0.65,   # occupancy-restricted employee units (no price cap) ~65% of market (E)
+        # (E) no RMOW development cost charge bylaw found; works-and-services and permit costs only
+        "fees": {"duplex": 8000, "multiplex": 8000, "townhouse": 8000, "woodframe": 8000, "midrise": 8000, "tower": 8000},
+        "inclusionary_toa": 0.0,
+        "grade_land": "C", "grade_zoning": "A",
+    },
+    "victoria": {
+        "label": "Victoria", "metro": "none", "hard_factor": 1.0,
+        # assessed values joined from the city's Property Assessment Report 2026 (grade A); VREB HPI Oct 2026 fallback (B)
+        "hpi_detached": {"Victoria": 1290000, "Fairfield / James Bay": 1450000, "Fernwood / Oaklands": 1180000, "Downtown": 1200000},
+        "prices": {"Victoria": [750, 950, 1050], "Fairfield / James Bay": [800, 1000, 1100], "Fernwood / Oaklands": [720, 900, 1000], "Downtown": [800, 1000, 1150]},   # (E) new condo $950-1,100/sf
+        "land_bsf": {"woodframe": 150, "midrise": 120, "tower": 100},   # (E)
+        # (E) City DCC ~$12,000/unit (2026) + CRD sewer DCC ~$2,500/unit + SSAC SD61 ~$1,000; no ACC adopted
+        "fees": {"duplex": 15500, "multiplex": 15500, "townhouse": 15500, "woodframe": 13500, "midrise": 13500, "tower": 13500},
+        "inclusionary_toa": 0.0,
+        "grade_land": "A", "grade_zoning": "A",
+    },
+    "saanich": {
+        "label": "Saanich", "metro": "none", "hard_factor": 1.0,
+        "hpi_detached": {"Saanich East": 1330000, "Saanich West": 1140000, "Cordova Bay": 1550000, "Gordon Head": 1300000},   # VREB HPI Oct 2026 (B/E)
+        "prices": {"Saanich East": [700, 850, 950], "Saanich West": [650, 800, 900], "Cordova Bay": [750, 900, 1000], "Gordon Head": [700, 850, 950]},   # (E)
+        "land_bsf": {"woodframe": 130, "midrise": 100, "tower": 80},   # (E)
+        # (E) Saanich DCC 2024 ~$15,000/unit multi-family + CRD ~$2,500 + SSAC; no ACC
+        "fees": {"duplex": 18500, "multiplex": 18500, "townhouse": 18500, "woodframe": 16000, "midrise": 16000, "tower": 16000},
+        "inclusionary_toa": 0.0,
+        "grade_land": "C", "grade_zoning": "B",
+    },
+    "oakbay": {
+        "label": "Oak Bay", "metro": "none", "hard_factor": 1.0,
+        "hpi_detached": {"Oak Bay": 2050000, "Uplands": 3200000},   # VREB HPI Oct 2026 (B/E)
+        "prices": {"Oak Bay": [900, 1050, 1150], "Uplands": [1000, 1100, 1200]},   # (E)
+        "land_bsf": {"woodframe": 200, "midrise": 150, "tower": 120},   # (E)
+        "fees": {"duplex": 17000, "multiplex": 17000, "townhouse": 17000, "woodframe": 15000, "midrise": 15000, "tower": 15000},   # (E)
+        "inclusionary_toa": 0.0,
+        "grade_land": "C", "grade_zoning": "D",
+    },
+    "esquimalt": {
+        "label": "Esquimalt", "metro": "none", "hard_factor": 1.0,
+        "hpi_detached": {"Esquimalt": 1060000},   # VREB HPI Oct 2026 (B/E)
+        "prices": {"Esquimalt": [650, 800, 900]},   # (E)
+        "land_bsf": {"woodframe": 110, "midrise": 90, "tower": 70},   # (E)
+        "fees": {"duplex": 14500, "multiplex": 14500, "townhouse": 14500, "woodframe": 12500, "midrise": 12500, "tower": 12500},   # (E)
+        "inclusionary_toa": 0.0,
+        "grade_land": "C", "grade_zoning": "D",
+    },
+    "langford": {
+        "label": "Langford", "metro": "none", "hard_factor": 0.95,
+        # assessed values on the city's parcel layer (grade A); VREB HPI Oct 2026 fallback
+        "hpi_detached": {"Langford": 1040000, "Bear Mountain": 1250000},
+        "prices": {"Langford": [560, 680, 750], "Bear Mountain": [600, 700, 780]},   # (E)
+        "land_bsf": {"woodframe": 80, "midrise": 65, "tower": 50},   # (E)
+        "fees": {"duplex": 13500, "multiplex": 13500, "townhouse": 13500, "woodframe": 12000, "midrise": 12000, "tower": 12000},   # (E) DCC ~$11k + CRD + SSAC SD62
+        "inclusionary_toa": 0.0,
+        "grade_land": "A", "grade_zoning": "D",
+    },
+    "colwood": {
+        "label": "Colwood", "metro": "none", "hard_factor": 0.95,
+        "hpi_detached": {"Colwood": 1100000, "Royal Bay": 1250000},   # VREB HPI Oct 2026 (B/E)
+        "prices": {"Colwood": [580, 700, 780], "Royal Bay": [620, 720, 800]},   # (E)
+        "land_bsf": {"woodframe": 85, "midrise": 70, "tower": 55},   # (E)
+        "fees": {"duplex": 15500, "multiplex": 15500, "townhouse": 15500, "woodframe": 13500, "midrise": 13500, "tower": 13500},   # (E)
+        "inclusionary_toa": 0.0,
+        "grade_land": "C", "grade_zoning": "D",
+    },
+    "viewroyal": {
+        "label": "View Royal", "metro": "none", "hard_factor": 0.95,
+        "hpi_detached": {"View Royal": 1100000},   # VREB HPI Oct 2026 (B/E)
+        "prices": {"View Royal": [600, 750, 820]},   # (E)
+        "land_bsf": {"woodframe": 90, "midrise": 70, "tower": 55},   # (E)
+        "fees": {"duplex": 14500, "multiplex": 14500, "townhouse": 14500, "woodframe": 12500, "midrise": 12500, "tower": 12500},   # (E)
+        "inclusionary_toa": 0.0,
+        "grade_land": "C", "grade_zoning": "D",
+    },
 }
 
 
@@ -243,6 +335,32 @@ def sub_area(city, lat, lon, neighbourhood="", station_dist_m=None, zone=""):
         if lon > -122.58:
             return "Cottonwood"
         return "East Central" if lon > -122.62 else "West Central"
+    if city == "abbotsford":
+        if lon < -122.33:
+            return "Abbotsford West"
+        return "Abbotsford East" if lon > -122.27 else "Abbotsford"
+    if city == "whistler":
+        if station_dist_m is not None and station_dist_m <= 1500:
+            return "Whistler Village"
+        return "Whistler South" if lat < 50.09 else "Whistler"
+    if city == "victoria":
+        if lat < 48.418 and lon < -123.33:
+            return "Fairfield / James Bay"
+        if 48.421 < lat < 48.432 and -123.375 < lon < -123.355:
+            return "Downtown"
+        return "Fernwood / Oaklands" if lon > -123.345 and lat > 48.43 else "Victoria"
+    if city == "saanich":
+        if lat > 48.50 and lon > -123.37:
+            return "Cordova Bay"
+        if lon > -123.33 and lat > 48.46:
+            return "Gordon Head"
+        return "Saanich East" if lon > -123.38 else "Saanich West"
+    if city == "oakbay":
+        return "Uplands" if lat > 48.447 and lon > -123.32 else "Oak Bay"
+    if city == "langford":
+        return "Bear Mountain" if lat > 48.465 and lon < -123.52 else "Langford"
+    if city == "colwood":
+        return "Royal Bay" if lat < 48.415 else "Colwood"
     return next(iter(CITIES[city]["hpi_detached"]))
 
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Build the self-contained dashboard (output/dashboard.html) from output/all_scored.csv (Vancouver) and,
-when present, output/metro/all_scored.csv (inner-ring municipalities scored by score_metro.py)."""
+when present, output/metro/all_scored.csv (the other 22 municipalities scored by score_metro.py)."""
 import json, os, math, re
 import pandas as pd
 import numpy as np
@@ -101,6 +101,21 @@ def fam(city, zone):
         if z.startswith(("RT", "RST")) or z in ("RM-1", "RM-4"): return "RT"
         if z.startswith(("C", "CRM")): return "C"
         return "RM"
+    if city == "abbotsford":
+        if z.startswith(("SSMUH", "RS", "SR", "RR")): return "R1"
+        if z.startswith(("TH", "RMG", "RMR", "RMF", "RM1", "RM3", "RM4", "RM6")): return "RT"
+        if z.startswith("C"): return "C"
+        return "RM"
+    if city == "whistler":
+        if z.startswith(("RS", "RI", "RT")): return "R1"
+        if z.startswith(("CC", "LC", "TA")): return "C"
+        return "RM"
+    if city in ("victoria", "saanich", "oakbay", "esquimalt", "langford", "colwood", "viewroyal"):
+        if z.startswith(("R1", "R-2", "R2", "RS", "RD", "RSM", "R-K", "R-J", "R-N", "A-")): return "R1"
+        if z.startswith(("RT", "GRD", "R3", "R4", "R5", "R6")) and city != "victoria": return "RT"
+        if z.startswith(("GRD", "RT")): return "RT"
+        if z.startswith(("C", "MU", "CC", "CA")): return "C"
+        return "RM"
     return "other"
 
 
@@ -135,7 +150,7 @@ cities = [{"code": "vancouver", "label": "Vancouver", "parcels": int(summary["pa
            "clearing": int(summary["clearing_target"]), "rows": len(rows), "grade_land": "A", "grade_zoning": "A",
            "value_basis": "BC Assessment 2026 roll"}]
 
-# ---- inner-ring municipalities
+# ---- other municipalities
 metro_path = os.path.join(HERE, "output", "metro", "all_scored.csv")
 msum_path = os.path.join(HERE, "output", "metro_summary.json")
 if os.path.exists(metro_path) and os.path.exists(msum_path):
@@ -146,9 +161,10 @@ if os.path.exists(metro_path) and os.path.exists(msum_path):
         sub = sub[(sub["oz_margin"] >= 0) | (sub["rank_profit"] <= 100)].head(MAX_ROWS_PER_CITY)
         n0 = len(rows)
         rows += [row_from(t, code) for t in sub.itertuples(index=False)]
+        assessed = cs.get("parcels_assessed", 0) > cs["parcels_total"] * 0.5
         cities.append({"code": code, "label": cs["city"], "parcels": cs["parcels_total"], "scored": cs["parcels_scored"],
                        "clearing": cs["clearing_target"], "rows": len(rows) - n0, "grade_land": cs["grade_land"], "grade_zoning": cs["grade_zoning"],
-                       "value_basis": "modelled from GVR HPI benchmark x lot size"})
+                       "value_basis": "BC Assessment 2026 roll (city open data)" if assessed else "modelled from MLS HPI benchmark x lot size"})
 
 # ---- outlines: Vancouver local areas + municipal hulls
 areas = []

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Score the inner-ring municipalities (Burnaby, Richmond, New Westminster, North Vancouver City & District).
+Score the municipalities outside the City of Vancouver (22 cities: Metro Vancouver, Fraser Valley, Sea-to-Sky and Greater Victoria).
 
 Reads:  data/metro/<city>.csv (from fetch_metro.py), assumptions.json, metro_config.py, zoning_metro.py
 Writes: output/metro/<city>_scored.csv, output/metro/all_scored.csv, output/metro_summary.json
@@ -42,7 +42,8 @@ def city_fees(cfg, typology, gfa_sf, units, queensborough=False, area=None):
     if "fees_per_m2" in cfg:
         tbl = cfg["fees_per_m2_queensborough"] if queensborough and "fees_per_m2_queensborough" in cfg else cfg["fees_per_m2"]
         f += tbl.get(typology, 0) * gfa_sf / SQFT_PER_M2
-    f += units * (METRO_DCC[cfg["metro"]][T["dcc_type"]] + TRANSLINK[T["dcc_type"]] + PERMITS_MISC_PER_UNIT)
+    tl = TRANSLINK[T["dcc_type"]] if cfg["metro"] != "none" else 0
+    f += units * (METRO_DCC[cfg["metro"]][T["dcc_type"]] + tl + PERMITS_MISC_PER_UNIT)
     return f
 
 
@@ -61,6 +62,10 @@ def proforma_city(cfg, site_sf, fsr, typology, tenure, area, incl, acq_price, mi
     if incl and str(incl).startswith("share_belowmarket:"):
         share = float(str(incl).split(":")[1])
         revenue *= 1 - share * (1 - A["toa"]["below_market_value_factor"])
+    elif incl and str(incl).startswith("share_employee:"):
+        # Whistler employee-restricted units: occupancy-restricted (no price cap) -> about 65% of market value (E)
+        share = float(str(incl).split(":")[1])
+        revenue *= 1 - share * (1 - cfg.get("employee_value_factor", 0.65))
     acq = acq_price + ptt_bc(acq_price) + acq_price * A["acquisition"]["closing_costs_pct"] + A["acquisition"]["demolition_per_site"]
     carry = acq_price * A["acquisition"]["carry_rate_annual"] * A["acquisition"]["carry_months"] / 12
     hard = gfa * T["hard"] * cfg["hard_factor"]
@@ -110,6 +115,14 @@ def score_city(city):
     hpi = df["local_area"].map(lambda a: cfg["hpi_detached"].get(a) or next(iter(cfg["hpi_detached"].values())))
     df["land_value_model"] = hpi * (df["site_m2"].clip(lower=150) / ref) ** LAND_ELASTICITY
     df["land_ref_m2"] = ref
+    # ---- assessed values where the city publishes them (Abbotsford, Victoria, Langford): grade A, same basis as Vancouver
+    for c in ("land_value", "improvement_value"):
+        df[c] = pd.to_numeric(df[c], errors="coerce") if c in df else np.nan
+    df["assessed_total"] = df["land_value"].fillna(0) + df["improvement_value"].fillna(0)
+    has_assess = df["land_value"].fillna(0) > 0
+    df["acq_basis"] = np.where(has_assess, df["assessed_total"] * A["acquisition"]["market_over_assessed"], df["land_value_model"])
+    df["imp_ratio"] = df["improvement_value"] / df["land_value"].replace(0, np.nan)
+    n_assess = int(has_assess.sum())
 
     # ---- candidate filter (mirrors Vancouver's, minus the assessment-based tests we cannot run)
     F = A["candidate_filter"]
@@ -118,6 +131,7 @@ def score_city(city):
     heritage = df["heritage"].fillna("").astype(str).str.strip().ne("") if "heritage" in df else pd.Series(False, index=df.index)
     owner_ok = ~df["owner_type"].fillna("Unknown").isin(["Local Government", "Crown Provincial", "Crown Federal", "Crown Agency", "Crown Municipal", "First Nation", "Untitled Provincial"])
     built_out = (df["year_built"].fillna(1900) >= F["year_built_cutoff"]) | (df["existing_fsr"].fillna(0) > 0.9)
+    built_out |= has_assess & (df["imp_ratio"].fillna(0) > F["max_improvement_to_land_ratio"])
     df["is_candidate"] = owner_ok & ~df["strata"] & ~excl_use & ~heritage & ~built_out & df["site_m2"].between(F["min_site_m2"], F["max_site_m2"])
 
     # ---- outright option
@@ -134,12 +148,13 @@ def score_city(city):
             rows.append(None)
         else:
             # pre-zoned apartment / commercial land: vendor wants max(house value, $/buildable)
-            acq = r.land_value_model
-            if opt["typology"] not in GROUND:
+            assessed = bool(r.land_value and r.land_value > 0)
+            acq = r.acq_basis
+            if opt["typology"] not in GROUND and not assessed:
                 acq = max(acq, cfg["land_bsf"].get(opt["typology"], 100) * r.site_sf * opt["fsr"])
                 land_grade = "D"
             else:
-                land_grade = cfg["grade_land"]
+                land_grade = "A" if assessed else cfg["grade_land"]
             pf = proforma_city(cfg, r.site_sf, opt["fsr"], opt["typology"], opt["tenure"], r.local_area, opt.get("incl"),
                                acq, opt.get("mixed_use", False), qb, units_cap=opt.get("units"))
             pf.update(fsr=opt["fsr"], typology=opt["typology"], tenure=opt["tenure"], storeys=opt["storeys"],
@@ -148,7 +163,7 @@ def score_city(city):
         # TOA rezoning upside (provincial minimums; needs a rezoning + inclusionary housing)
         if tier and r.is_candidate and r.site_m2 >= tier["min_site_m2"] and str(r.zone).upper()[:1] in ("R", "C", "G", "N", "M", "S") and "alr" not in r.flagset:
             incl = f"share_belowmarket:{cfg['inclusionary_toa']}" if cfg["inclusionary_toa"] else None
-            acq = max(r.land_value_model, cfg["land_bsf"].get(tier["typology"], 100) * r.site_sf * tier["fsr"] * 0.8)
+            acq = max(r.acq_basis, cfg["land_bsf"].get(tier["typology"], 100) * r.site_sf * tier["fsr"] * 0.8)
             pf = proforma_city(cfg, r.site_sf, tier["fsr"], tier["typology"], "strata", r.local_area, incl, acq, False, qb)
             pf.update(fsr=tier["fsr"], typology=tier["typology"], tier=tier["label"])
             toa_rows.append(pf)
@@ -180,9 +195,11 @@ def score_city(city):
     scored["best_profit"] = scored[["oz_profit", "toa_profit"]].max(axis=1)
     scored["best_basis"] = np.where(scored["toa_profit"].fillna(-1e18) > scored["oz_profit"], "TOA rezoning", "Outright zoning")
     scored["city_label"] = cfg["label"]
-    scored["assessed_total"] = scored["oz_acq_price"]   # modelled acquisition value stands in for the assessment roll
-    scored["land_value"] = scored["land_value_model"]
-    scored["improvement_value"] = np.nan
+    # modelled acquisition value stands in for the assessment roll where the city publishes none
+    assessed_rows = scored["land_value"].fillna(0) > 0
+    scored["assessed_total"] = np.where(assessed_rows, scored["assessed_total"], scored["oz_acq_price"])
+    scored["land_value"] = np.where(assessed_rows, scored["land_value"], scored["land_value_model"])
+    scored["improvement_value"] = np.where(assessed_rows, scored["improvement_value"], np.nan)
     scored.to_csv(os.path.join(OUT, f"{city}_scored.csv"), index=False)
     top = scored[scored["clears_target"]].head(100) if scored["clears_target"].sum() >= 100 else scored.head(100)
     top = top.copy(); top["rank"] = np.arange(1, len(top) + 1)
@@ -198,10 +215,10 @@ def score_city(city):
         "median_margin_top100": float(top["oz_margin"].median()) if len(top) else None,
         "by_zone_top100": top["zone"].value_counts().head(12).to_dict(),
         "by_typology_top100": top["oz_typology"].value_counts().to_dict(),
-        "land_ref_m2": ref, "grade_land": cfg["grade_land"], "grade_zoning": cfg["grade_zoning"],
-        "zones_seen": df["zone"].value_counts().head(30).to_dict(),
+        "land_ref_m2": ref, "grade_land": "A" if n_assess > len(df) * 0.5 else cfg["grade_land"], "grade_zoning": cfg["grade_zoning"],
+        "parcels_assessed": n_assess, "zones_seen": df["zone"].value_counts().head(30).to_dict(),
     }
-    print(f"-- {cfg['label']}: {len(df):,} parcels, {int(df['is_candidate'].sum()):,} candidates, {len(scored):,} scored, "
+    print(f"-- {cfg['label']}: {len(df):,} parcels ({n_assess:,} with assessed values), {int(df['is_candidate'].sum()):,} candidates, {len(scored):,} scored, "
           f"{summ['positive_margin']:,} positive, {summ['clearing_target']:,} clear 15%; ref lot {ref:.0f} m2")
     print(top[["address", "zone", "site_m2", "assessed_total", "oz_fsr", "oz_typology", "oz_profit", "oz_margin"]].head(8).to_string(index=False))
     return scored, summ

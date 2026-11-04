@@ -486,12 +486,183 @@ def _mapleridge(zone, site_m2, frontage_m, ctx):
     return None   # C-7 Lougheed corridor (not read), CD, A, P, M, H
 
 
+# ------------------------------------------------------------------ Abbotsford (Zoning Bylaw 2400-2014; SSMUH zones Bylaws 3690/3691/3692-2025, adopted 16 Dec 2025)
+ABBY_RM = {"RM16": 0.21, "RM30": 0.40, "RM45": 0.60, "RM60": 0.80}   # units/ha townhouse zones -> FAR derived at ~130 m2 per unit
+
+
+def _abbotsford(zone, site_m2, frontage_m, ctx):
+    z = zone.upper().strip()
+    flags = ctx.get("flags") or set()
+    if "alr" in flags or "luc" in flags:
+        return None
+    if z == "SSMUH 1":
+        if site_m2 > 4050 or "urban_area" not in flags:
+            return None
+        n = 3 if site_m2 <= 280 else 4
+        return _o(0.9 if n == 3 else 1.2, "multiplex", 3, f"SSMUH 1: {n}-unit townhouse form, FSR {0.9 if n == 3 else 1.2}, 11 m (principal units may be owned)", grade="B", units=n)
+    if z.startswith("SSMUH"):
+        if site_m2 > 4050 or "urban_area" not in flags:
+            return None
+        n = 3 if site_m2 <= 280 else 4
+        return _o(0.65, "duplex", 3, f"{z}: duplex + suites / garden suite ({n} units), FSR 0.65, 9.5 m; accessory units not strata-able -> single-lot product", grade="B", units=n)
+    if z in ("TH1", "TH2"):
+        return _o(1.5, "townhouse", 3, f"{z} townhouse FSR 1.5, 11 m", grade="C" if z == "TH2" else "B") if site_m2 >= 1000 else None
+    if z in ("RMG", "RMR"):
+        return _o(1.5, "townhouse", 3, f"{z} ground-oriented / rowhouse FSR 0.5-1.5", grade="A") if site_m2 >= 900 else None
+    if z == "RMF":
+        return _o(0.8, "townhouse", 3, "RMF flex townhouse, 60 units/ha (FAR derived)", grade="C") if site_m2 >= 1000 else None
+    if z in ABBY_RM:
+        return _o(ABBY_RM[z], "townhouse", 3, f"{z} townhouse {z[2:]} units/ha (FAR derived)", grade="C") if site_m2 >= 1500 else None
+    if z == "RML":
+        return _o(1.4, "woodframe", 6, "RML low-rise apartment FSR 1.4 (1.7 with bonus), 6 storeys", grade="A") if site_m2 >= 1200 else None
+    if z in ("RMM", "RMM-R"):
+        return _o(2.5, "woodframe", 6, "RMM mid-rise apartment FSR 2.5, 6 storeys (12 on three Gladwin / Old Yale sites)", grade="A", tenure="rental" if z.endswith("-R") else "strata") if site_m2 >= 1500 else None
+    if z in ("RMU", "RMX", "RMC", "RH1", "RMH"):
+        return _o(2.0, "woodframe", 5, f"{z} multi-family; FSR placeholder", grade="D") if site_m2 >= 1200 else None
+    if z == "C7":
+        hist = "historic" in str(ctx.get("ocp") or "").lower()
+        o = _o(3.0 if hist else 2.5, "woodframe" if hist else "midrise", 3 if hist else 6, f"C7 downtown commercial: FSR {'3.0 (Historic Centre, 3 st)' if hist else '2.5 (Urban Centre; 3.5 with bonus)'}, residential with another principal use", grade="A"); o["mixed_use"] = True
+        return o
+    return None   # RS* (not yet SSMUH-mapped), SR/SRH/RR rural, A*, C1-C5, N* comprehensive development, I*, P*
+
+
+# ------------------------------------------------------------------ Whistler (Zoning Bylaw 303 s.35; SSMUH Bylaws 2440 (Jun 2024) and 2461 (Mar 2025))
+def _whistler(zone, site_m2, frontage_m, ctx):
+    z = zone.upper().replace(" ", "")
+    flags = ctx.get("flags") or set()
+    if z in ("RS1", "RI1", "RS2", "RS4", "RT1", "RT2", "RT6") and ("ssmuh4" in flags or "ssmuh3" in flags):
+        if ctx.get("toa_tier") or site_m2 > 4050:
+            return None
+        n = 3 if "ssmuh3" in flags else 4
+        cap = 0.45 if z in ("RT1", "RT6") else 0.40
+        fsr = min(cap, 511.0 / site_m2)
+        return _o(fsr, "multiplex", 2, f"SSMUH {n} units; GFA the lower of FSR {cap} or 511 m2; {n // 2} units employee-restricted rental (strata with housing agreement)", grade="A", units=n, incl="share_employee:0.5")
+    return None   # RM1..RM74 / RTA / CC / LC site-specific zones are built out; nightly-rental and tourist zones not modelled
+
+
+# ------------------------------------------------------------------ Victoria (Zoning Regulation Bylaw 80-159 Schedule P houseplex; Missing Middle Bylaw 22-045 Jan 2023 + SSMUH Jun 2024)
+def _victoria(zone, site_m2, frontage_m, ctx):
+    z = zone.upper().replace(" ", "")
+    if z in ("R1-B", "R1-G", "R1-A", "R-2", "R1-S", "R1-S2", "R-K", "R-J", "R-N", "R-2-CH"):
+        if site_m2 > 4050:
+            return None
+        n = 3 if site_m2 <= 280 else 6   # Schedule P houseplex: up to 6 units on Traditional Residential lots, no transit test
+        fsr = min(1.0, 1410.0 / site_m2)
+        return _o(fsr, "multiplex", 3, f"Schedule P houseplex: {n} units, FSR 1.0, 11 m, coverage 40% (corner townhouse 1.1 not modelled)", grade="A", units=n)
+    if z in ("R3-1", "R3-2", "R3-A1", "R3-A2", "R3-AM-1", "R3-AM-2", "R3-C", "R3-G", "R3-S"):
+        return _o(1.0 if z in ("R3-1", "R3-2") else 1.4, "woodframe", 4, f"{z} multiple dwelling district; FSR placeholder", grade="D") if site_m2 >= 900 else None
+    if z in ("R-48", "R-59", "R-68"):
+        return _o(1.2, "woodframe", 4, f"{z} multiple dwelling; FSR placeholder", grade="D") if site_m2 >= 900 else None
+    if z == "GRD-1":
+        return _o(1.0, "townhouse", 3, "GRD-1 ground-oriented residential (ZB2018) FSR 1.0 placeholder", grade="D") if site_m2 >= 700 else None
+    if z in ("LVD-1", "CVD-1"):
+        return _o(1.5 if z == "LVD-1" else 2.0, "woodframe", 4 if z == "LVD-1" else 6, f"{z} (ZB2018) FSR placeholder", grade="D") if site_m2 >= 900 else None
+    if z in ("C-1", "C1-N", "C1-S", "C1-G", "CA-1", "CA-3", "CA-4"):
+        o = _o(3.0, "midrise", 8, f"{z} central-area commercial: FSR 3.0 (Downtown Core Area Plan), ground-floor commercial", grade="C"); o["mixed_use"] = True
+        return o
+    return None
+
+
+# ------------------------------------------------------------------ Saanich (Zoning Bylaw 8200 Schedule G SSMUH, in force 30 Jun 2024)
+def _saanich(zone, site_m2, frontage_m, ctx):
+    z = zone.upper().replace(" ", "")
+    flags = ctx.get("flags") or set()
+    if "alr" in flags:
+        return None
+    if re.match(r"^RS-\d+[A-Z]?$|^RD-\d+$|^A-[12]$", z):
+        if "urban_area" not in flags or site_m2 > 4050 or ctx.get("toa_tier"):
+            return None
+        n = _ssmuh_units(site_m2, ctx.get("ftn", False))
+        fsr = 1.1 if n == 6 else 1.0
+        return _o(fsr, "multiplex", 3, f"Schedule G SSMUH {n} units (6 in the Transit Proximity Area), FSR {fsr}, 11 m; strata permitted", grade="B", units=n)
+    if z.startswith("RT-"):
+        return _o(0.8, "townhouse", 3, f"{z} attached housing; FSR placeholder", grade="D") if site_m2 >= 900 else None
+    if z.startswith("RA-") or z.startswith("RM-"):
+        return _o(1.3, "woodframe", 4, f"{z} apartment; FSR placeholder", grade="D") if site_m2 >= 1200 else None
+    if z in ("C-3", "C-4", "C-5", "C-6", "C-13") or z.startswith("CMU"):
+        o = _o(2.0, "woodframe", 6, f"{z} commercial / mixed-use; FSR placeholder", grade="D"); o["mixed_use"] = True
+        return o
+    return None
+
+
+# ------------------------------------------------------------------ Oak Bay (Zoning Bylaw 3531 Schedule G, SSMUH adopted Jun 2024: houseplex FSR 1.0, coverage 50%)
+def _oakbay(zone, site_m2, frontage_m, ctx):
+    z = zone.upper().replace(" ", "")
+    if z.startswith("RS") and site_m2 <= 4050:
+        n = _ssmuh_units(site_m2, ctx.get("ftn", False))
+        return _o(1.0, "multiplex", 3, f"SSMUH houseplex {n} units, FSR 1.0, coverage 50% (zone assumed RS: Oak Bay publishes no zoning layer)", grade="D", units=n)
+    return None
+
+
+# ------------------------------------------------------------------ Esquimalt (Zoning Bylaw 2050; RSM-1 small-scale multi-unit zone Jun 2024)
+def _esquimalt(zone, site_m2, frontage_m, ctx):
+    z = zone.upper().replace(" ", "")
+    flags = ctx.get("flags") or set()
+    if "rsm1" in flags or z in ("RS-1", "RS-2", "RS-3", "RS-4", "RS-5", "RS-6", "RD-1", "RD-2", "RD-3", "RD-4", "RSM-1", "RSM1"):
+        if site_m2 > 4050:
+            return None
+        n = 3 if site_m2 <= 280 else 4
+        return _o(0.8, "multiplex", 3, f"RSM-1 small-scale multi-unit: {n} units; FSR placeholder 0.8", grade="D", units=n)
+    if z.startswith("RM-"):
+        return _o(1.2, "woodframe", 4, f"{z} multiple family; FSR placeholder", grade="D") if site_m2 >= 1000 else None
+    return None
+
+
+# ------------------------------------------------------------------ Langford (Zoning Bylaw 300; SSMUH Amendment Bylaw 2183 Schedule AA, Jun 2024)
+def _langford(zone, site_m2, frontage_m, ctx):
+    z = zone.upper().replace(" ", "")
+    if z in ("R2", "RS1", "RS2", "RS3", "R1", "RR1", "RR2", "RR3"):
+        if ctx.get("toa_tier") or site_m2 > 4050 or z.startswith("RR") and site_m2 > 2000:
+            return None
+        n = _ssmuh_units(site_m2, ctx.get("ftn", False))
+        return _o(0.9, "multiplex", 3, f"SSMUH {n} units (Schedule AA frequent-stop lots get 6); FSR placeholder 0.9", grade="D", units=n)
+    if z.startswith("RT"):
+        return _o(1.0, "townhouse", 3, f"{z} townhouse; FSR placeholder", grade="D") if site_m2 >= 900 else None
+    if z.startswith("RM") or z.startswith("RH"):
+        return _o(1.6 if z.startswith("RM") else 3.0, "woodframe" if z.startswith("RM") else "midrise", 4 if z.startswith("RM") else 10, f"{z} multi-family; FSR placeholder", grade="D") if site_m2 >= 1000 else None
+    if z.startswith("MU") or z in ("CC1", "CC2", "C1", "C3"):
+        o = _o(2.5, "woodframe", 6, f"{z} mixed-use / city centre; FSR placeholder", grade="D"); o["mixed_use"] = True
+        return o
+    return None
+
+
+# ------------------------------------------------------------------ Colwood (Land Use Bylaw 151; SSMUH Jun 2024)
+def _colwood(zone, site_m2, frontage_m, ctx):
+    z = zone.upper().replace(" ", "")
+    if z in ("R1", "R2", "R3", "R4", "R5", "R6", "RC1"):
+        if ctx.get("toa_tier") or site_m2 > 4050:
+            return None
+        n = _ssmuh_units(site_m2, ctx.get("ftn", False))
+        return _o(0.8, "multiplex", 3, f"SSMUH {n} units; FSR placeholder 0.8", grade="D", units=n)
+    if z.startswith("RT"):
+        return _o(1.0, "townhouse", 3, f"{z} townhouse; FSR placeholder", grade="D") if site_m2 >= 900 else None
+    if z.startswith("RM"):
+        return _o(1.4, "woodframe", 4, f"{z} multi-family; FSR placeholder", grade="D") if site_m2 >= 1000 else None
+    if z.startswith("MU") or z.startswith("C"):
+        o = _o(2.0, "woodframe", 5, f"{z} commercial / mixed-use; FSR placeholder", grade="D"); o["mixed_use"] = True
+        return o
+    return None
+
+
+# ------------------------------------------------------------------ View Royal (Zoning Bylaw 900; SSMUH map Aug 2024; six prescribed stops)
+def _viewroyal(zone, site_m2, frontage_m, ctx):
+    z = zone.upper().replace(" ", "")
+    if z.startswith("R1") and site_m2 <= 4050:
+        n = _ssmuh_units(site_m2, ctx.get("ftn", False))
+        return _o(0.8, "multiplex", 3, f"SSMUH {n} units; FSR placeholder 0.8 (zone assumed R1: no open zoning layer)", grade="D", units=n)
+    return None
+
+
 CITY_RULES = {"burnaby": _burnaby, "richmond": _richmond, "newwest": _newwest, "cnv": _cnv, "dnv": _dnv,
               "surrey": _surrey, "coquitlam": _coquitlam, "portmoody": _portmoody, "delta": _delta, "westvan": _westvan,
-              "langleycity": _langleycity, "langleytwp": _langleytwp, "mapleridge": _mapleridge}
+              "langleycity": _langleycity, "langleytwp": _langleytwp, "mapleridge": _mapleridge,
+              "abbotsford": _abbotsford, "whistler": _whistler, "victoria": _victoria, "saanich": _saanich, "oakbay": _oakbay,
+              "esquimalt": _esquimalt, "langford": _langford, "colwood": _colwood, "viewroyal": _viewroyal}
 
 # Cities where Bill 47 tiers apply only to bus-exchange / commuter-rail TOAs (B.C. Reg. 263/2023 tables 4-5), or not at all
-TOA_KINDS = {"delta": ("bus",), "westvan": (), "mapleridge": ("bus",), "dnv": ("bus",), "cnv": ("bus",)}
+TOA_KINDS = {"delta": ("bus",), "westvan": (), "mapleridge": ("bus",), "dnv": ("bus",), "cnv": ("bus",),
+             "abbotsford": ("bus_bc",), "whistler": ("bus_whistler",), "victoria": ("bus_bc",), "saanich": ("bus_bc",), "oakbay": (),
+             "esquimalt": (), "langford": ("bus_bc",), "colwood": ("bus_bc",), "viewroyal": ("bus_bc",)}
 
 
 def rule_for(city, zone, site_m2, frontage_m, ctx=None):
@@ -515,6 +686,8 @@ def rule_for(city, zone, site_m2, frontage_m, ctx=None):
 TOA_TIERS = {
     "skytrain": [(200, 1, 5.0, "tower", 20, 1348), (400, 2, 4.0, "midrise", 12, 1348), (800, 3, 3.0, "midrise", 8, 460)],
     "bus": [(200, 4, 4.0, "midrise", 12, 1348), (400, 5, 3.0, "midrise", 8, 460)],
+    "bus_bc": [(200, 4, 3.5, "midrise", 10, 1348), (400, 5, 2.5, "woodframe", 6, 460)],         # Table 4-5 item 2 (Abbotsford, Capital Region, ...)
+    "bus_whistler": [(200, 4, 2.5, "woodframe", 6, 1000), (400, 5, 1.5, "woodframe", 4, 460)],  # Table 4-5 item 3 (Whistler, Penticton, Lantzville)
 }
 
 

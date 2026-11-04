@@ -82,7 +82,7 @@ current to September 2026 — see the dashboard's notes section for the specific
 This is a screening tool, not an appraisal: assessments lag the market, frontage is estimated,
 and heritage, view cones, soils, tenant relocation and financing structure are not modelled.
 
-## Other Metro Vancouver municipalities (13 cities)
+## Other municipalities (22 cities: Metro Vancouver, Fraser Valley, Sea-to-Sky, Greater Victoria)
 
 ```
 pip install shapely
@@ -92,7 +92,9 @@ python build_dashboard.py  # dashboard gains a View selector: region or one city
 ```
 
 Covered: Burnaby, Richmond, New Westminster, North Vancouver City & District, Surrey, Coquitlam, Port Moody, Delta,
-West Vancouver, Langley City, Langley Township and Maple Ridge. Outside Vancouver no assessed values are open data, so acquisition prices are **modelled** from the GVR HPI
+West Vancouver, Langley City, Langley Township, Maple Ridge, Abbotsford, Whistler, Victoria, Saanich, Oak Bay, Esquimalt,
+Langford, Colwood and View Royal. Abbotsford, Victoria and Langford publish BC Assessment values with their parcels (used directly, grade A);
+elsewhere no assessed values are open data, so acquisition prices are **modelled** from the GVR / FVREB / VREB HPI
 benchmark and lot size (grade C) and every row carries a zoning-rule grade (A–D). Sources, rules and known gaps:
 `docs/metro_sources.md`. Richmond has no open zoning layer; a c.2020 academic zoning map is remapped to the 2024 RSM
 pre-zoning, so treat Richmond results as indicative.
