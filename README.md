@@ -82,7 +82,7 @@ current to September 2026 — see the dashboard's notes section for the specific
 This is a screening tool, not an appraisal: assessments lag the market, frontage is estimated,
 and heritage, view cones, soils, tenant relocation and financing structure are not modelled.
 
-## Inner-ring municipalities (Burnaby, Richmond, New Westminster, North Vancouver City & District)
+## Other Metro Vancouver municipalities (13 cities)
 
 ```
 pip install shapely
@@ -91,7 +91,8 @@ python score_metro.py      # same pro forma, city fee schedules, modelled land v
 python build_dashboard.py  # dashboard gains a View selector: region or one city
 ```
 
-Outside Vancouver no assessed values are open data, so acquisition prices are **modelled** from the GVR HPI
+Covered: Burnaby, Richmond, New Westminster, North Vancouver City & District, Surrey, Coquitlam, Port Moody, Delta,
+West Vancouver, Langley City, Langley Township and Maple Ridge. Outside Vancouver no assessed values are open data, so acquisition prices are **modelled** from the GVR HPI
 benchmark and lot size (grade C) and every row carries a zoning-rule grade (A–D). Sources, rules and known gaps:
 `docs/metro_sources.md`. Richmond has no open zoning layer; a c.2020 academic zoning map is remapped to the 2024 RSM
 pre-zoning, so treat Richmond results as indicative.

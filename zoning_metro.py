@@ -274,7 +274,224 @@ def _dnv(zone, site_m2, frontage_m, ctx):
     return None   # R1 rural, RM/RL/RH (Part 5 not verified; largely built-out), C, CD
 
 
-CITY_RULES = {"burnaby": _burnaby, "richmond": _richmond, "newwest": _newwest, "cnv": _cnv, "dnv": _dnv}
+# ------------------------------------------------------------------ Surrey (Zoning By-law 12000, consolidated 21 Sep 2026; MR zones renamed 15 Jun 2026)
+SURREY_MR = {  # zone: (fsr, typology, storeys, mixed)
+    "MR1": (0.7, "townhouse", 3, False), "MR2": (0.9, "townhouse", 3, False), "MR3": (0.8, "townhouse", 3, False), "MR4": (1.0, "townhouse", 3, False),
+    "MR5": (1.5, "townhouse", 4, False), "MR6": (1.4, "woodframe", 4, False), "MR6C": (1.6, "woodframe", 4, True),
+    "MR7": (2.0, "woodframe", 6, False), "MR7C": (2.2, "woodframe", 6, True), "MR8": (4.0, "tower", 25, False), "MR8C": (4.3, "tower", 25, True),
+    "MR9": (5.0, "tower", 40, False), "MR9C": (5.3, "tower", 40, True), "MR10": (5.5, "tower", 40, False), "MR10C": (6.0, "tower", 40, True),
+    "MR10CBD": (7.5, "tower", 40, True), "RM70": (1.3, "townhouse", 4, False),
+}
+
+
+def _surrey(zone, site_m2, frontage_m, ctx):
+    z = zone.upper().replace(" ", "").replace("-", "")
+    if z in ("RA", "R1", "R2", "R2O", "R3", "R4", "R5", "R5S", "R6", "R7"):
+        if ctx.get("toa_tier"):
+            # inside a transit-oriented area SSMUH does not apply (max 2 units): duplex at FAR 1.0 on the first 560 m2 + 0.6
+            fsr = (1.0 * min(site_m2, 560) + 0.6 * max(0, site_m2 - 560)) / site_m2
+            return _o(min(fsr, 1.0), "duplex", 3, "R-zone inside a TOA: SSMUH does not apply, duplex (2 units) outright", grade="B", units=2)
+        if site_m2 > 4050:
+            return None
+        n = _ssmuh_units(site_m2, ctx.get("ftn", False))
+        fsr = (1.0 * min(site_m2, 560) + 0.6 * max(0, site_m2 - 560)) / site_m2
+        fsr = min(fsr, 600.0 / site_m2 if n >= 3 else fsr)   # houseplex floor area cap 600 m2 (excl. basement)
+        return _o(fsr, "multiplex", 3, f"Surrey SSMUH {n} units (houseplex FAR 1.0 to 560 m2 + 0.6, cap 600 m2; 6 units in a Frequent Bus Stop Area)", grade="B", units=n)
+    if z in SURREY_MR:
+        f, typ, st, mixed = SURREY_MR[z]
+        if z.startswith("MR7") and ctx.get("toa_tier"):
+            f = 3.0; typ = "midrise"; st = 8
+        if typ == "tower" and site_m2 < 1800:
+            return None
+        o = _o(f, typ, st, f"{z} base density (bonus density via amenity cash not modelled)", grade="B")
+        o["mixed_use"] = mixed
+        return o
+    return None   # C-35 / CCR / CD site-specific, industrial, agricultural
+
+
+# ------------------------------------------------------------------ Coquitlam (Zoning Bylaw 3000; R-1..R-4 SSMUH zones Jun 2025; RA/MU zones 2026)
+def _coquitlam(zone, site_m2, frontage_m, ctx):
+    z = zone.upper().strip()
+    if z in ("R-1", "R-2"):
+        n = 3 if site_m2 <= 280 else 4
+        return _o(0.75 + 0.07, "multiplex", 3, f"{z} small-scale: {n} units, FAR 0.75 + parking bonus, 3 storeys / 11 m (no 6-unit tier in Coquitlam)", grade="A", units=n)
+    if z == "R-3":
+        return _o(0.5, "duplex", 3, "R-3 transitional: 2 principal + 2 accessory units, FAR 0.5 (townhouse-designated, consolidation expected)", grade="A", units=2)
+    if z in ("R-4", "RT-1"):
+        return _o(0.85 if z == "R-4" else 0.75, "multiplex", 3, f"{z} multiplex FAR {0.85 if z == 'R-4' else 0.75}", grade="A", units=4)
+    if z == "RM-1":
+        return _o(0.45, "townhouse", 2, "RM-1 townhouse 0.45 FAR", grade="A")
+    if z == "RM-2":
+        return _o(1.4, "woodframe", 3, "RM-2 apartment 1.4 FAR, 3 storeys", grade="A")
+    if z in ("RM-3", "RM-4", "RM-4A", "RM-5", "RM-6"):
+        f, typ, st = {"RM-3": (1.8, "woodframe", 6), "RM-4": (2.5, "midrise", 10), "RM-4A": (2.5, "midrise", 10), "RM-5": (3.0, "midrise", 12), "RM-6": (4.0, "tower", 20)}[z]
+        return _o(f, typ, st, f"{z} legacy apartment zone; FAR taken from storey range (bylaw table not read)", grade="D")
+    if z == "RA-1":
+        return _o(1.85, "midrise", 8, "RA-1: 2.04 FAR, density above 1.85 must be rental -> strata modelled at 1.85, 8 storeys", grade="A")
+    if z == "RA-2":
+        t = ctx.get("toa_tier")
+        f, st = (4.0, 12) if t in (1, 2) else (3.0, 8)
+        return _o(2.4, "midrise", st, f"RA-2 (TOA): {f} FAR / {st} storeys, strata capped at 2.4 FAR, remainder rental", grade="A")
+    if z == "RA-3":
+        return _o(4.0, "tower", 20, "RA-3 high-density: 4.0 FAR base (rental bonus to 5.5 not modelled)", grade="A")
+    if z in ("MU-1", "MU-2", "MU-3", "MU-4"):
+        f, typ, st = {"MU-1": (2.5, "midrise", 8), "MU-2": (4.0, "midrise", 12), "MU-3": (5.0, "tower", 25), "MU-4": (5.5, "tower", 30)}[z]
+        o = _o(f, typ, st, f"{z} mixed-use base FAR (employment share and rental bonus not modelled)", grade="A"); o["mixed_use"] = True
+        return o
+    return None   # RS-* (in TOA, retained), RTM-1, C-1/C-2/C-5/C-6, CD, P, M
+
+
+# ------------------------------------------------------------------ Port Moody (Bylaw 2937; SSMUH Bylaw 3460 Jun 2024)
+def _portmoody(zone, site_m2, frontage_m, ctx):
+    z = zone.upper().strip()
+    if z.startswith("RS") or z == "RT":
+        if ctx.get("toa_tier") or site_m2 > 4050:
+            return None
+        n = _ssmuh_units(site_m2, ctx.get("ftn", False))
+        fsr = {3: 0.70, 4: 0.80, 6: 1.0}[n]
+        return _o(fsr, "multiplex", 3, f"SSMUH {n} units, FAR {fsr}, 3 storeys (DP only, strata permitted)", grade="B", units=n)
+    if z in ("RM1", "RM2", "RM3", "RM4"):
+        return _o(0.8 if z in ("RM3", "RM4") else 0.7, "townhouse", 3, f"{z} townhouse; FAR estimated (bylaw table not read)", grade="D")
+    if z == "RM5":
+        return _o(1.5, "woodframe", 4, "RM5 four-storey apartment; FAR estimated", grade="D")
+    if z == "RM8":
+        return _o(2.0, "woodframe", 6, "RM8 six-storey apartment; FAR estimated", grade="D")
+    if z in ("CRM1", "CRM2"):
+        o = _o(1.5 if z == "CRM1" else 2.5, "woodframe", 4 if z == "CRM1" else 6, f"{z} mixed-use; FAR estimated", grade="D"); o["mixed_use"] = True
+        return o
+    return None   # RM6/RM7 Heritage Woods (built out), C1-C8, TC1, CD
+
+
+# ------------------------------------------------------------------ Delta (Zoning Bylaw 7600; SSMUH in force Jun 2024, Delta's own site standards)
+def _delta(zone, site_m2, frontage_m, ctx):
+    z = zone.upper().replace(" ", "")
+    flags = ctx.get("flags") or set()
+    if "alr" in flags:
+        return None
+    if re.match(r"^RS[1-7]A?$|^RSC$|^RSF$|^RD[1-4]$", z):
+        if site_m2 > 4050:
+            return None
+        n = _ssmuh_units(site_m2, ctx.get("ftn", False))
+        fsr = (0.30 * site_m2 + 93.0) / site_m2
+        typ = "duplex"   # house or duplex + suites + garden suites, sold as one property (suites not strata-able)
+        return _o(fsr, typ, 2.5, f"{z}: {n} units allowed (house/duplex + suites + garden suites), FSR 0.3 x lot + 93 m2, 2.5 storeys; single-lot product", grade="B", units=n)
+    m = re.match(r"^RT(40|50|62|76)$", z)
+    if m:
+        f = {"40": 0.6, "50": 0.7, "62": 0.8, "76": 0.9}[m.group(1)]
+        return _o(f, "townhouse", 3, f"{z} townhouse {m.group(1)} units/ha (FAR derived)", grade="C") if site_m2 >= 2000 else None
+    if z == "TH2":
+        return _o(0.8, "townhouse", 3, "TH2 townhouse (FAR derived)", grade="C")
+    if z == "RA6":
+        return _o(3.0, "midrise", 6, "RA6: FAR 3.0, 6 storeys (Bylaw 8426, 2024)", grade="A") if site_m2 >= 2000 else None
+    if z == "RA20":
+        return _o(0.6, "woodframe", 3, "RA20 low-rise apartment 20 units/ha (FAR derived)", grade="C")
+    if z in ("RA112", "RA120"):
+        return _o(1.2, "woodframe", 4, f"{z} apartment ~120 units/ha, 4 storeys / 17 m (FAR derived)", grade="C") if site_m2 >= 2000 else None
+    if z == "RH40":
+        return _o(2.0, "midrise", 8, "RH40 high-rise zone; FAR placeholder", grade="D")
+    if z in ("MUL", "MULW"):
+        o = _o(2.5, "woodframe", 6, "Ladner MUL mixed-use, 6 storeys, residential rental-only (no FAR stated; 2.5 assumed)", tenure="rental", grade="D"); o["mixed_use"] = True
+        return o
+    return None   # C zones (secondary residential only), CD/CDZ site-specific, A, I, P
+
+
+# ------------------------------------------------------------------ West Vancouver (Bylaw 4662; Bill 25 SSMUH amendments pending Sept 2026)
+def _westvan(zone, site_m2, frontage_m, ctx):
+    z = zone.upper().replace(" ", "")
+    if z in ("RD1", "RD2"):
+        return _o(0.5, "duplex", 2, "RD1/RD2: duplex / ground-oriented FAR 0.5, 2 storeys + basement (4-6 units allowed since Aug 2024 within the same FAR)", grade="A", units=4)
+    if z == "RD3":
+        return _o(0.75, "multiplex", 2, "RD3: FAR 0.75, 4 units (6 near a prescribed bus stop)", grade="A", units=4)
+    if z == "RM1":
+        return _o(2.0, "midrise", 12, "RM1 apartment FAR 2.0 (1.75 west of 23rd St), up to 20 storeys", grade="A") if site_m2 >= 1115 else None
+    if z == "RM2":
+        return _o(2.0, "midrise", 8, "RM2 apartment FAR 2.0", grade="A") if site_m2 >= 1115 else None
+    if z == "RM5":
+        return _o(1.0, "woodframe", 3, "RM5 apartment FAR 1.0, 3 storeys", grade="A") if site_m2 >= 650 else None
+    if z in ("RG-1A", "RG-1B", "RG1A", "RG1B", "RG-2", "RG2"):
+        return _o(0.6, "townhouse", 3, f"{z} Horseshoe Bay ground-oriented, FAR 0.6 with amenity unit ($45/sf)", grade="A")
+    if z in ("RG-3", "RG3"):
+        return _o(1.0, "townhouse", 3, "RG-3 Horseshoe Bay FAR 1.0 with amenity unit", grade="A")
+    if z in ("AC1", "AC2"):
+        o = _o(1.0, "woodframe", 3, f"{z} Ambleside Centre base FAR 1.0 (1.75 with amenity contribution, rate unpublished)", grade="B"); o["mixed_use"] = (z == "AC1")
+        return o
+    return None   # RS1-RS10 (FAR 0.30 house; Bylaw 5446 SSMUH amendments pending), RM3/RM4, C1-C4 (no FAR), CD, CV
+
+
+# ------------------------------------------------------------------ Langley City (Zoning Bylaw 3300, adopted 9 Mar 2026)
+def _langleycity(zone, site_m2, frontage_m, ctx):
+    z = zone.upper().strip()
+    if z == "R1":
+        if ctx.get("toa_tier"):
+            return None   # inside a TOA R1 allows one principal dwelling + suite only
+        n = 6 if ctx.get("ftn") else 4
+        return _o(0.9, "multiplex", 3, f"R1 plex home: {n} units, no FAR (coverage 36%, 9 m / 3 storeys) -> derived 0.9", grade="C", units=n)
+    if z == "R2":
+        return _o(1.2, "townhouse", 3, "R2 townhouse FAR 1.2, 11 m", grade="A") if site_m2 >= 1000 else None
+    if z in ("R3", "R3A"):
+        return _o(2.1, "woodframe", 6, f"{z} low-rise apartment FAR 2.1 base (2.6 with 13% below-market bonus), 6 storeys", grade="A") if site_m2 >= 1000 else None
+    if z == "R4":
+        return _o(2.6, "midrise", 12, "R4 mid-rise FAR 2.6 base (3.5 bonus), 12 storeys", grade="A") if site_m2 >= 1850 else None
+    if z == "R5":
+        return _o(4.5, "tower", 15, "R5 high-rise FAR 4.5, 46 m", grade="A") if site_m2 >= 1850 else None
+    if z == "C1":
+        o = _o(2.6, "midrise", 8, "C1 downtown commercial mixed-use FAR 2.6 base (3.5 in Mixed-Use OCP area)", grade="A"); o["mixed_use"] = True
+        return o
+    return None   # R5a, C2/C3, I, M, P, U1
+
+
+# ------------------------------------------------------------------ Langley Township (Bylaw 2500; SSMUH Bylaw 6020 Nov 2024, no FSR)
+def _langleytwp(zone, site_m2, frontage_m, ctx):
+    z = zone.upper().replace(" ", "")
+    flags = ctx.get("flags") or set()
+    if re.match(r"^(SR-1|SR-3|R-1[A-E]|R-2|R-CL(\([A-Z]+\))?)$", z):
+        if ctx.get("toa_tier") or site_m2 > 4050:
+            return None
+        n = 3 if site_m2 <= 280 else 4
+        # coverage 45% with infill, 9 m, third storey limited to 50-80% of the ground floor -> ~0.95 effective
+        return _o(0.95, "multiplex", 3, f"SSMUH {n} units; no FSR (45% coverage, 9 m, limited third storey) -> derived 0.95; water/sewer connection deferral may apply", grade="C", units=n)
+    if z in ("RM-1", "RM-2"):
+        return _o(0.7 if z == "RM-1" else 0.8, "townhouse", 3, f"{z} townhouse; FAR estimated (Bylaw 2500 tables not read)", grade="D")
+    if z in ("RM-3", "RM-3A", "RM-4"):
+        return _o(1.75 if z != "RM-4" else 2.0, "woodframe", 4, f"{z} apartment; FAR estimated (Bylaw 2500 tables not read)", grade="D")
+    return None   # RU-*, SR-2 (rural / ALR), C-*, CD-*, M, P
+
+
+# ------------------------------------------------------------------ Maple Ridge (Bylaw 7600-2019; RUR infill zone 2026)
+def _mapleridge(zone, site_m2, frontage_m, ctx):
+    z = zone.upper().replace(" ", "")
+    flags = ctx.get("flags") or set()
+    if z in ("RS-1", "RS-1A", "RS-1B", "RS-1D", "RS-2", "RS-3", "SRS", "RUR", "R-1", "R-2", "R-3", "R-4", "RT-1"):
+        if "urban_area" not in flags or site_m2 > 4050:
+            return None
+        n = _ssmuh_units(site_m2, ctx.get("ftn", False))
+        return _o(0.75, "multiplex", 3, f"Urban infill residential (SSMUH) {n} units; FAR taken as 0.75 (s.627 RUR not read)", grade="D", units=n)
+    if z == "RT-2":
+        return _o(0.75, "multiplex", 2, "RT-2 triplex/fourplex infill FAR 0.75", grade="B", units=4)
+    if z in ("RST", "RST-SV"):
+        return _o(0.9, "townhouse", 3, "RST fee-simple street townhouse (FAR derived from 223 m2 cap per unit)", grade="C")
+    if z in ("RM-1", "RM-4"):
+        return _o(0.6 if z == "RM-1" else 0.75, "townhouse", 3, f"{z} townhouse FAR base (+0.15 bonus not modelled)", grade="B") if site_m2 >= 1000 else None
+    if z == "RM-5":
+        return _o(0.8, "woodframe", 3, "RM-5 low-density apartment FAR 0.8", grade="B") if site_m2 >= 1115 else None
+    if z == "RM-2":
+        return _o(1.8, "woodframe", 4, "RM-2 medium-density apartment FAR 1.8 (+0.4 bonus not modelled)", grade="B") if site_m2 >= 1300 else None
+    if z == "RM-3":
+        return _o(1.2, "woodframe", 5, "RM-3 apartment; FAR 1.2 (column mapping uncertain)", grade="D") if site_m2 >= 1300 else None
+    if z == "RM-6":
+        return _o(1.6, "midrise", 10, "RM-6 Town Centre high-density apartment; FAR 1.6 (+0.5) uncertain", grade="D") if site_m2 >= 2000 else None
+    if z in ("C-3", "CRM"):
+        o = _o(1.0, "woodframe", 4, f"{z} town centre / commercial-residential, residential FAR 1.0 (bonus not modelled)", grade="D"); o["mixed_use"] = True
+        return o
+    return None   # C-7 Lougheed corridor (not read), CD, A, P, M, H
+
+
+CITY_RULES = {"burnaby": _burnaby, "richmond": _richmond, "newwest": _newwest, "cnv": _cnv, "dnv": _dnv,
+              "surrey": _surrey, "coquitlam": _coquitlam, "portmoody": _portmoody, "delta": _delta, "westvan": _westvan,
+              "langleycity": _langleycity, "langleytwp": _langleytwp, "mapleridge": _mapleridge}
+
+# Cities where Bill 47 tiers apply only to bus-exchange / commuter-rail TOAs (B.C. Reg. 263/2023 tables 4-5), or not at all
+TOA_KINDS = {"delta": ("bus",), "westvan": (), "mapleridge": ("bus",), "dnv": ("bus",), "cnv": ("bus",)}
 
 
 def rule_for(city, zone, site_m2, frontage_m, ctx=None):

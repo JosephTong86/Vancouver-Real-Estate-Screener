@@ -32,11 +32,13 @@ def price_for(cfg, area, typology):
     return row[0] if typology in GROUND else (row[1] if typology == "woodframe" else row[2])
 
 
-def city_fees(cfg, typology, gfa_sf, units, queensborough=False):
+def city_fees(cfg, typology, gfa_sf, units, queensborough=False, area=None):
     T = A["typologies"][typology]
     f = cfg["fees"].get(typology, 0) * units
     if "fees_per_sf" in cfg:
-        f += cfg["fees_per_sf"].get(typology, 0) * gfa_sf
+        tbl = dict(cfg["fees_per_sf"])
+        tbl.update(cfg.get("fees_per_sf_area", {}).get(area, {}))
+        f += tbl.get(typology, 0) * gfa_sf
     if "fees_per_m2" in cfg:
         tbl = cfg["fees_per_m2_queensborough"] if queensborough and "fees_per_m2_queensborough" in cfg else cfg["fees_per_m2"]
         f += tbl.get(typology, 0) * gfa_sf / SQFT_PER_M2
@@ -63,7 +65,7 @@ def proforma_city(cfg, site_sf, fsr, typology, tenure, area, incl, acq_price, mi
     carry = acq_price * A["acquisition"]["carry_rate_annual"] * A["acquisition"]["carry_months"] / 12
     hard = gfa * T["hard"] * cfg["hard_factor"]
     soft = hard * A["soft_cost_pct_of_hard"]
-    fees = city_fees(cfg, typology, gfa, units, queensborough)
+    fees = city_fees(cfg, typology, gfa, units, queensborough, area)
     cost = acq + carry + hard + soft + fees
     profit = revenue - cost
     non_land = hard + soft + fees + A["acquisition"]["demolition_per_site"]
@@ -91,6 +93,11 @@ def score_city(city):
     df["strata"] = df["strata"].astype(str).str.lower().isin(("true", "1", "y", "yes"))
     df["zone"] = df["zone"].fillna("").astype(str)
     df["address"] = df["address"].fillna("").astype(str)
+    for c in ("ftn", "flags", "heritage", "landuse", "neighbourhood", "overlay", "ocp", "zcat"):
+        if c not in df:
+            df[c] = ""
+    df["ftn_flag"] = df["ftn"].astype(str).str.lower().isin(("true", "1", "y", "yes"))
+    df["flagset"] = df["flags"].fillna("").astype(str).map(lambda s: set(x for x in s.split(";") if x))
     df.loc[df["address"].str.strip() == "", "address"] = "PID " + df["pid"].fillna("").astype(str).str.replace(r"(\d{3})(\d{3})(\d{3})", r"\1-\2-\3", regex=True)
     df["site_sf"] = df["site_m2"] * SQFT_PER_M2
     df["frontage_m_est"] = df["frontage_m"].fillna(df["site_m2"] / TYPICAL_LOT_DEPTH_M)
@@ -117,9 +124,9 @@ def score_city(city):
     rows, toa_rows = [], []
     for r in df.itertuples(index=False):
         tier = toa_tier(r.station_kind, r.station_dist_m) if pd.notna(r.station_dist_m) else None
-        ftn = (city == "newwest" and r.zone == "RGO-B") or (city == "cnv" and str(r.ocp).upper() in ("LRN2", "R4"))
+        ftn = bool(r.ftn_flag) or (city == "newwest" and r.zone == "RGO-B") or (city == "cnv" and str(r.ocp).upper() in ("LRN2", "R4"))
         ctx = dict(overlay=r.overlay if isinstance(r.overlay, str) else "", ocp=r.ocp if isinstance(r.ocp, str) else "",
-                   ftn=ftn, toa_tier=tier["tier"] if tier else None, zcat=r.zcat,
+                   ftn=ftn, toa_tier=tier["tier"] if tier else None, zcat=r.zcat, flags=r.flagset,
                    quadrant=burnaby_quadrant(r.lat, r.lon) if city == "burnaby" else "")
         opt = rule_for(city, r.zone, r.site_m2, r.frontage_m_est, ctx)
         qb = r.local_area == "Queensborough"
@@ -139,7 +146,7 @@ def score_city(city):
                       zoning_note=opt["note"], incl=opt.get("incl") or "", grade=opt["grade"], land_grade=land_grade, acq_price=acq)
             rows.append(pf)
         # TOA rezoning upside (provincial minimums; needs a rezoning + inclusionary housing)
-        if tier and r.is_candidate and r.site_m2 >= tier["min_site_m2"] and str(r.zone).upper()[:1] in ("R", "C", "G", "N", "M"):
+        if tier and r.is_candidate and r.site_m2 >= tier["min_site_m2"] and str(r.zone).upper()[:1] in ("R", "C", "G", "N", "M", "S") and "alr" not in r.flagset:
             incl = f"share_belowmarket:{cfg['inclusionary_toa']}" if cfg["inclusionary_toa"] else None
             acq = max(r.land_value_model, cfg["land_bsf"].get(tier["typology"], 100) * r.site_sf * tier["fsr"] * 0.8)
             pf = proforma_city(cfg, r.site_sf, tier["fsr"], tier["typology"], "strata", r.local_area, incl, acq, False, qb)

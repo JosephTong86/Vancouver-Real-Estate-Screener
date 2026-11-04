@@ -12,7 +12,7 @@ summary = json.load(open(os.path.join(HERE, "output", "summary.json")))
 df = pd.read_csv(os.path.join(HERE, "output", "all_scored.csv"), low_memory=False)
 
 GROUP = {"duplex": "G", "multiplex": "G", "townhouse": "G", "woodframe": "W", "midrise": "C", "tower": "C"}
-MAX_ROWS_PER_CITY = 2500
+MAX_ROWS_PER_CITY = 1500
 
 
 def r(x, d=0):
@@ -60,6 +60,46 @@ def fam(city, zone):
     if city == "dnv":
         if z == "R2" or z.startswith("RS"): return "R1"
         if z.startswith("C"): return "C"
+        return "RM"
+    if city == "surrey":
+        if re.match(r"^R[1-7]|^RA$|^R2O|^R5S", z): return "R1"
+        if z in ("MR1", "MR2", "MR3", "MR4", "MR5", "RM70"): return "RT"
+        if z.startswith("C") or z.endswith("C") or z == "MR10CBD": return "C"
+        return "RM"
+    if city == "coquitlam":
+        if z.startswith(("R-1", "R-2", "R-3", "R-4", "RT-", "RS-")): return "R1" if z.startswith(("R-", "RS-")) else "RT"
+        if z.startswith(("MU-", "C-")): return "C"
+        if z == "RM-1": return "RT"
+        return "RM"
+    if city == "portmoody":
+        if z.startswith("RS") or z == "RT": return "R1"
+        if z in ("RM1", "RM2", "RM3", "RM4"): return "RT"
+        if z.startswith(("C", "TC")): return "C"
+        return "RM"
+    if city == "delta":
+        if z.startswith("RS") or z.startswith("RD"): return "R1"
+        if z.startswith(("RT", "TH")): return "RT"
+        if z.startswith(("MU", "C")): return "C"
+        return "RM"
+    if city == "westvan":
+        if z.startswith("RD"): return "R1"
+        if z.startswith("RG"): return "RT"
+        if z.startswith(("AC", "C")): return "C"
+        return "RM"
+    if city == "langleycity":
+        if z == "R1": return "R1"
+        if z == "R2": return "RT"
+        if z.startswith("C"): return "C"
+        return "RM"
+    if city == "langleytwp":
+        if z.startswith(("SR-", "R-")): return "R1"
+        if z in ("RM-1", "RM-2"): return "RT"
+        if z.startswith("C"): return "C"
+        return "RM"
+    if city == "mapleridge":
+        if z.startswith(("RS", "RUR", "SRS", "R-")): return "R1"
+        if z.startswith(("RT", "RST")) or z in ("RM-1", "RM-4"): return "RT"
+        if z.startswith(("C", "CRM")): return "C"
         return "RM"
     return "other"
 
