@@ -269,17 +269,29 @@ def arcgis_pages(url, fields, where="1=1", geometry=True, page=2000):
         page = min(page, int(info.get("maxRecordCount", page)) or page)
     except Exception:
         pass
-    off, fmt = 0, "geojson"
+    off, fmt, order, bad = 0, "geojson", None, 0
     while True:
         p = {"where": where, "outFields": ",".join(fields), "f": fmt, "outSR": 4326,
              "returnGeometry": "true" if geometry else "false", "resultOffset": off, "resultRecordCount": page}
+        if order:
+            p["orderByFields"] = order
         r = get(url + "/query", params=p)
         try:
             js = r.json()
         except Exception:
-            raise RuntimeError(f"non-JSON from {url}: {r.text[:300]}")
+            js = {"error": f"non-JSON response: {r.text[:120]!r}"}
         if "error" in js:
+            # old ArcGIS Servers (e.g. Esquimalt 10.9) fail offset paging in GeoJSON without an order; some sites answer a
+            # maintenance page intermittently (Langley City): retry as Esri JSON ordered by OBJECTID, then back off
+            bad += 1
+            if bad == 1 and (fmt != "json" or not order):
+                fmt, order = "json", "OBJECTID"
+                continue
+            if bad <= 4:
+                time.sleep(10 * bad)
+                continue
             raise RuntimeError(f"ArcGIS error from {url}: {js['error']}")
+        bad = 0
         feats = js.get("features", [])
         if fmt == "geojson" and geometry and off == 0 and feats and all(f.get("geometry") is None for f in feats[:50]):
             fmt = "json"   # retry this page as Esri JSON

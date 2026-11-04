@@ -553,10 +553,22 @@ def _victoria(zone, site_m2, frontage_m, ctx):
         return _o(1.0 if z in ("R3-1", "R3-2") else 1.4, "woodframe", 4, f"{z} multiple dwelling district; FSR placeholder", grade="D") if site_m2 >= 900 else None
     if z in ("R-48", "R-59", "R-68"):
         return _o(1.2, "woodframe", 4, f"{z} multiple dwelling; FSR placeholder", grade="D") if site_m2 >= 900 else None
-    if z == "GRD-1":
-        return _o(1.0, "townhouse", 3, "GRD-1 ground-oriented residential (ZB2018) FSR 1.0 placeholder", grade="D") if site_m2 >= 700 else None
+    if z in ("GRD-1", "GRD-1(PGA)"):
+        # Zoning Bylaw 2018 s.4.1 (2026 consolidation; replaces R1-B etc. across the Traditional Residential area):
+        # 3+ units in <=3 storeys FSR 1.6 / 12 m on lots >= 360 m2; >3 storeys (4 st / 14 m, 5 st in a PGA or TOA) FSR 1.6 on lots >= 540 m2 with 15 m frontage
+        if site_m2 < 360 or site_m2 > 4050:
+            return None
+        pga = "PGA" in z
+        if site_m2 >= 540 and frontage_m >= 15:
+            st = 5 if (pga or ctx.get("toa_tier")) else 4
+            return _o(1.6, "woodframe", st, f"GRD-1{' (PGA)' if pga else ''}: 3+ units above 3 storeys, FSR 1.6 (Schedule C), {st} st, coverage 55%", grade="A")
+        return _o(1.6, "multiplex", 3, f"GRD-1{' (PGA)' if pga else ''}: 3+ units in 3 storeys, FSR 1.6 (Schedule C), 12 m, coverage 45%", grade="A")
     if z in ("LVD-1", "CVD-1"):
-        return _o(1.5 if z == "LVD-1" else 2.0, "woodframe", 4 if z == "LVD-1" else 6, f"{z} (ZB2018) FSR placeholder", grade="D") if site_m2 >= 900 else None
+        o = _o(1.6, "woodframe", 4, f"{z} village district: FSR 1.6, 14 m, coverage 80%, no dwellings on the first storey (mixed-use)", grade="A"); o["mixed_use"] = True
+        return o if site_m2 >= 540 else None
+    if z in ("TCD-1", "CBD-1", "CBD-2"):
+        o = _o(3.0 if z == "TCD-1" else 4.0, "midrise", 8 if z == "TCD-1" else 12, f"{z} (ZB2018) FSR placeholder", grade="D"); o["mixed_use"] = True
+        return o if site_m2 >= 700 else None
     if z in ("C-1", "C1-N", "C1-S", "C1-G", "CA-1", "CA-3", "CA-4"):
         o = _o(3.0, "midrise", 8, f"{z} central-area commercial: FSR 3.0 (Downtown Core Area Plan), ground-floor commercial", grade="C"); o["mixed_use"] = True
         return o
