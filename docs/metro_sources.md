@@ -95,3 +95,53 @@ Transit: Surrey–Langley SkyTrain stations (Green Timbers, 152 St, Fleetwood, B
 * Langley Township: Bylaw 2500 RM tables; DCC reduction and ACC adoption status; servicing deferral.
 * Maple Ridge: RUR (s.627) FSR / coverage; RM-3 / RM-6 / C-7 standards; ACC rate schedule.
 * All batch-2 cities: no open assessed values or year built (except West Vancouver's DATE_BUILT when its layer responds), so recently rebuilt houses are not screened out.
+
+---
+
+# Batch 3 (research 4 Nov 2026): Abbotsford, Whistler, Greater Victoria core (Victoria, Saanich, Oak Bay, Esquimalt, Langford, Colwood, View Royal)
+
+## Parcel and zoning endpoints
+
+| City | Parcels | Zoning | Enrichment / land values |
+|---|---|---|---|
+| Abbotsford | AGOL `services8.arcgis.com/ZYlQy38aWlfDG1Qh/.../Parcel_Layers_External_Feature/FeatureServer/0` (30,825; PID, PROP_ADDRESS, ZONING, OCP_LandUse, UDA, ALR, FLOODPLN, HAP, LUC) | on the parcel (also `Development_Layers_External_Feature/45`) | **BC Assessment LAND_VALUE / IMP_VALUE on the parcel (29,484 rows) — grade A** |
+| Whistler | `webmap.whistler.ca/server/rest/services/ExternalVS/Parcels/MapServer/0` (15,442 incl. strata lots; non-strata 2,544; PID, FOLIOADRSS, ZONING1) | on the parcel | SSMUH dwelling-count polygons `ExternalVS/Land_Use/MapServer/4` (3 / 4 units); TOA buffers `/3` |
+| Victoria | CRD lot fabric `mapservices.crd.bc.ca/arcgis/rest/services/Properties/MapServer/2` (BCAJurisdiction 234; 13,472 subdivision lots; PID, FullAddress, OwnerType) | `maps.victoria.ca/server/rest/services/OpenData/OpenData_PlanningAndDevelopment/MapServer/12` (Zoning; 705 district polygons, ZB1980 / ZB2018) | **Property Assessment Report 2026 `services.arcgis.com/EHSKalEvBxdO9ljW/.../Property_Assessment_Report_2026/FeatureServer/0` (land_gross / impr_gross by PID) — grade A**; Heritage Properties `/10` |
+| Saanich | CRD lot fabric (308 / 309 / 389; 30,754) | `map.saanich.ca/server/rest/services/MAPS/SaanichMapService_External/MapServer/28` (ZONINGTYPE) | SSMUH Transit Proximity Area `/128` (6 units), Urban Containment Boundary `/11`, ALR `/10`, OCP `/134` |
+| Oak Bay | CRD lot fabric (317; 5,972) | **none published** — private lots 200–4,050 m² assumed RS (zoning grade D) | — |
+| Esquimalt | CRD lot fabric (307; 2,791) | `gis.esquimalt.ca/arcgis/rest/services/Services/Zoning/MapServer/0` (Zone) | RSM-1 small-scale multi-unit parcels `Services/RSM/MapServer/0` (PID) |
+| Langford | `arcex.langford.ca/server/rest/services/Parcel_Info_Map/Parcel_Info_Webmap_EB/MapServer/10` (Parcels_For_CV; PID, Full_Address, ZONE_ABR) | on the parcel (`/12` Zoning) | **LandValue / ImprovementsValue on the parcel — grade A**; OCP `/30` |
+| Colwood | AGOL `services3.arcgis.com/MLf7r3NQY1Pb8feC/.../mapParcel/FeatureServer/0` (PID, Address, OwnerType, SubCategory) | `mapZoning/FeatureServer/1` (ZoneCode) | — |
+| View Royal | CRD lot fabric (401 / 402; 2,097) | **PDF only** — private lots assumed R1 (zoning grade D) | — |
+
+Transit (B.C. Reg. 263/2023 Schedule; Tables 4–5 item 2 = FAR 3.5 / 10 st within 200 m, 2.5 / 6 st to 400 m; item 3 for Whistler = 2.5 / 6 and 1.5 / 4): Bourquin Exchange (Abbotsford), Gondola Exchange (Whistler), Legislature (Victoria), Uptown, Royal Oak, UVic (Saanich), Colwood, Langford and VGH (View Royal) exchanges. Esquimalt and Oak Bay have no prescribed TOA. Outside Metro Vancouver there is no regional or TransLink DCC.
+
+## Zoning rules encoded (grades)
+
+**Abbotsford — Zoning Bylaw 2400-2014; SSMUH zones (Bylaws 3690/3691/3692-2025) adopted 16 Dec 2025, Application Guide Jan 2026.** SSMUH 1: townhouse form up to 4 principal units, FSR 0.9 (3 units) / 1.2 (4), 11 m, coverage 50/75 %, min 495 m² / 16.5 m; principal units may be owned (B). SSMUH 2 / 2g / 3 / 4: house or duplex + suites / garden suite / coach house, FSR 0.65, 9.5 m — accessory units cannot be sold separately, modelled as a single-lot duplex product (B). Lots inside the Urban Development Boundary only (UDA flag); no 6-unit tier (no frequent bus service); ALR and land-use-contract lots excluded. TH1 FSR 1.5 (B), TH2 1.5 (C); RMG / RMR 0.5–1.5 (A); RMF 60 u/ha and RM16/30/45/60 u/ha townhouse → derived FAR 0.21–0.8 (C); RML 1.4 (1.7 bonus) 6 st and RMM 1.0–2.5 6 st (A); C7 3.0 Historic Centre (3 st) / 2.5 Urban Centre (A). Fees: DCC Bylaw 3633-2025 + ACC Bylaw 3637-2025 (1 Feb 2026) per unit incl. ACC and SSAC — duplex $40,497; townhouse/SSMUH $31,743; apartment $20,423 (A). Prices: presale condo $550–650/sf, townhouse ~$500/sf (E).
+
+**Whistler — Zoning and Parking Bylaw 303 s.35; SSMUH Bylaws 2440 (Jun 2024) and 2461 (Mar 2025).** RS1 / RI1 / RS2 / RS4 / RT1 / RT2 / RT6 lots ≤ 4,050 m² inside the Urban Development Containment Area with water and sewer, outside the Gondola Exchange TOA: 3 units (≤ 280 m²) or 4; GFA the lower of FSR 0.40 (0.45 in RT1/RT6) or 511 m²; 4 units → 2 employee-restricted rental units (housing agreement; strata permitted with it) (A). Employee units valued at 65 % of market (E). RM1–RM74 / RTA / CC site-specific zones are built out and not scored. Fees: no RMOW DCC bylaw found — $8,000/unit works-and-services placeholder (E). Prices: new product $1,500–2,000/sf (E); HPI detached ~$3.0M (E).
+
+**Victoria — Zoning Regulation Bylaw 80-159 Schedule P (Missing Middle Bylaw 22-045, Jan 2023; SSMUH Jun 2024).** Traditional Residential lots (R1-B, R1-G, R1-A, R-2 …): houseplex 3–6 units, FSR 1.0, 11 m, coverage 40 %, max 1,410 m² floor area, no transit test; corner townhouse FSR 1.1 (corner lots not identifiable → not modelled) (A). R3-*, R-48/59/68, GRD-1, LVD-1, CVD-1 legacy / 2018 districts: FSR placeholders (D). C-1 / CA-* central area FSR 3.0 (C). Fees: City DCC ~$12,000/unit + CRD sewer ~$2,500 + SSAC (E). Land values: BC Assessment 2026 by PID (A).
+
+**Saanich — Zoning Bylaw 8200 Schedule G (SSMUH in force 30 Jun 2024).** RS-* / RD-* / A-1/A-2 lots inside the Urban Containment Boundary, ≤ 4,050 m², outside TOAs: 3 / 4 units, 6 within the SSMUH Transit Proximity Area (400 m of an SSMUH bus stop); FSR 1.0 (1.1 for 6 units), 11 m; strata permitted (B — the guide lists FSR 0.6 / 1.0 / 1.1 without mapping to unit counts). RT / RA / RM / C: placeholders (D). Fees: DCC ~$15,000/unit + CRD + SSAC (E).
+
+**Oak Bay — Zoning Bylaw 3531 Schedule G (adopted 10 Jun 2024).** Houseplex 3–4 units (6 near a frequent stop), FSR 1.0, coverage 50 % (B via architect summary). No zoning layer: every private lot 200–4,050 m² is treated as RS (D). Fees ~$17,000/unit (E).
+
+**Esquimalt — Zoning Bylaw 2050; RSM-1 small-scale multi-unit zone (Jun 2024).** RSM-1 parcels (city layer) and RS-* / RD-*: 3–4 units; FSR not retrieved → 0.8 placeholder (D). No TOA, no 6-unit tier.
+
+**Langford — Zoning Bylaw 300; SSMUH Amendment Bylaw 2183 with Schedule AA stops (May 2024).** R2 / RS1 / R1 lots 281–4,047 m² outside the Langford Exchange TOA: 4 units, 6 within 400 m of a Schedule AA stop (stops not retrieved → ftn unknown); FSR placeholder 0.9 (D). RT / RM / RH / MU / CC: placeholders (D). Land values: BC Assessment on the parcel layer (A).
+
+**Colwood — Land Use Bylaw 151 (SSMUH Jun 2024).** R1–R6 lots outside the Colwood Exchange TOA: 3–4 units; FSR placeholder 0.8 (D).
+
+**View Royal — Zoning Bylaw 900 (SSMUH map Aug 2024).** R1 lots: 3–4 units, 6 within 400 m of six prescribed stops (not retrieved); FSR placeholder 0.8; zoning assumed R1 (D).
+
+## Known gaps (batch 3)
+
+* Abbotsford: SSMUH 3 / 4 standards; TH2, RMU/RMX/RMC/RH1 FSR; C7 Urban Centre height; sub-area HPI (assessed values make this secondary).
+* Whistler: RMOW DCC / works-and-services charges; employee-unit value discount; RS1 height increase (2025 proposal).
+* Victoria: FSR for R3-*, R-48/59/68, GRD-1, LVD-1, CVD-1 and the 2025 OCP pre-zoning; corner-lot detection; 2026 DCC schedule.
+* Saanich: which FSR (0.6 / 1.0 / 1.1) applies to which unit count; Schedule G coverage by lot type; DCC schedule; apartment / commercial FSRs.
+* Oak Bay and View Royal: no open zoning layer — zones assumed; View Royal prescribed stops.
+* Esquimalt, Langford, Colwood: SSMUH FSR / height from the bylaw text; multi-family and mixed-use FSRs; DCC schedules; Langford Schedule AA stops.
+* All Capital Region cities: prices and HPI are estimates (VREB benchmark not fetched); no year-built data except through assessed improvement ratios (Victoria, Langford).
