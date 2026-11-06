@@ -182,6 +182,9 @@ const pct = v => v==null? '—' : (v*100).toFixed(0)+'%';
 const int = v => v==null? '—' : Math.round(v).toLocaleString('en-CA');
 const TYPO = DATA.assumptions.typologies;
 const GCOL = {G:'var(--g)',W:'var(--w)',C:'var(--c)'};
+// Leaflet draws on a canvas, which cannot resolve CSS variables: use the computed colours for the map dots
+const _cs=getComputedStyle(document.documentElement);
+const MAPCOL = {G:(_cs.getPropertyValue('--g')||'#2a78d6').trim(),W:(_cs.getPropertyValue('--w')||'#eb6834').trim(),C:(_cs.getPropertyValue('--c')||'#1baf7a').trim()};
 const CITIES = DATA.cities || [{code:'vancouver',label:'Vancouver',parcels:DATA.summary.parcels_total,scored:DATA.summary.parcels_scored,clearing:DATA.summary.clearing_target,grade_land:'A',grade_zoning:'A'}];
 const CITY = {}; CITIES.forEach(c=>CITY[c.code]=c);
 const multi = CITIES.length>1;
@@ -329,7 +332,7 @@ function drawMap(top){
   [...top].reverse().forEach((r,ri)=>{ if(r.lat==null) return;
     const i=top.length-1-ri; const p=Math.max(r.profit, st.sort==='best'&&r.toa_profit!=null?r.toa_profit:-Infinity);
     const rad=4+10*Math.sqrt(Math.max(0,p)/maxP);
-    const c=L.circleMarker([r.lat,r.lon],{radius:rad,color: st.sel===r?'#111827':'#ffffff',weight: st.sel===r?2.5:1.2,fillColor:GCOL[r.group],fillOpacity:.8});
+    const c=L.circleMarker([r.lat,r.lon],{radius:rad,color: st.sel===r?'#111827':'#ffffff',weight: st.sel===r?2.5:1.2,fillColor:MAPCOL[r.group]||'#888',fillOpacity:.85});
     c.bindTooltip(`<strong>#${i+1} ${r.address}</strong><br>${(CITY[r.city||'vancouver']||{}).label||'Vancouver'} · ${r.zone} · ${r.fsr.toFixed(2)} FSR<br>${money(r.profit)} (${pct(r.margin)})`,{direction:'top',opacity:.95});
     c.on('click',()=>select(r));
     c.addTo(dotLayer); markerOf.set(r,c);
