@@ -106,7 +106,7 @@ details.notes td,details.notes th{padding:4px 10px;cursor:default;position:stati
 </header>
 
 <section class="controls" aria-label="Filters">
-  <div class="ctl"><label for="f-view">View</label><select id="f-view"><option value="region">All cities (region)</option></select></div>
+  <div class="ctl"><label for="f-view">View</label><select id="f-view"><option value="region">Metro Vancouver (region)</option><option value="island">Greater Victoria (region)</option></select></div>
   <div class="ctl"><label for="f-q">Search address / zone</label><input type="text" id="f-q" placeholder="e.g. Broadway, C-2A, Kitsilano"></div>
   <div class="ctl"><label for="f-budget" id="lbl-budget">Max assessed value</label>
     <select id="f-budget"><option value="">Any budget</option><option value="2000000">≤ $2M</option><option value="3000000">≤ $3M</option><option value="5000000">≤ $5M</option><option value="10000000">≤ $10M</option><option value="25000000">≤ $25M</option></select></div>
@@ -178,18 +178,26 @@ const multi = CITIES.length>1;
 const isVan = r => r.city==='vancouver' || !r.city;
 const GRADE_TXT = {A:'A · bylaw / assessment roll',B:'B · city bulletin or secondary source',C:'C · derived or modelled',D:'D · placeholder, verify'};
 
+// regional views: Metro Vancouver (default) and Greater Victoria; Abbotsford and Whistler are per-city only
+const ISLAND=['victoria','saanich','oakbay','esquimalt','langford','colwood','viewroyal'];
+const REGIONS={region:{label:'Metro Vancouver',cities:CITIES.filter(c=>!ISLAND.includes(c.code)&&!['abbotsford','whistler'].includes(c.code)).map(c=>c.code)},
+               island:{label:'Greater Victoria',cities:CITIES.filter(c=>ISLAND.includes(c.code)).map(c=>c.code)}};
+const isRegion = v => !!REGIONS[v];
+const inView = code => isRegion(st.view) ? REGIONS[st.view].cities.includes(code) : code===st.view;
+const viewCities = () => isRegion(st.view) ? CITIES.filter(c=>REGIONS[st.view].cities.includes(c.code)) : CITIES.filter(c=>c.code===st.view);
 // ---------- state
 const st = {view: multi?'region':'vancouver', q:'',budget:'',area:'',min:'',max:'',margin:0.15,sort:'profit',zones:new Set(['R1','RT','RM','R345','C','RR']),groups:new Set(['G','W','C']),listed:false,shown:100,sel:null};
-try{const s=JSON.parse(localStorage.getItem('vrs-filters')||'null'); if(s){Object.assign(st,s,{zones:new Set(s.zones),groups:new Set(s.groups),shown:100,sel:null}); if(!CITY[st.view] && st.view!=='region') st.view=multi?'region':'vancouver';}}catch(e){}
+try{const s=JSON.parse(localStorage.getItem('vrs-filters')||'null'); if(s){Object.assign(st,s,{zones:new Set(s.zones),groups:new Set(s.groups),shown:100,sel:null}); if(!CITY[st.view] && !REGIONS[st.view]) st.view=multi?'region':'vancouver';}}catch(e){}
 function save(){try{localStorage.setItem('vrs-filters',JSON.stringify({...st,zones:[...st.zones],groups:[...st.groups]}));}catch(e){}}
-const viewRows = () => st.view==='region' ? rows : rows.filter(r=>(r.city||'vancouver')===st.view);
+const viewRows = () => rows.filter(r=>inView(r.city||'vancouver'));
 const vanView = () => st.view==='vancouver';
 
 // populate view + area selects
 CITIES.forEach(c=>{const o=document.createElement('option');o.value=c.code;o.textContent=c.label+(c.code==='vancouver'?' (assessed values)':' (modelled values)');$('#f-view').appendChild(o);});
-if(!multi){$('#f-view').querySelector('option[value=region]').remove();}
+if(!multi){$('#f-view').querySelector('option[value=region]').remove();$('#f-view').querySelector('option[value=island]').remove();}
+if(!REGIONS.island.cities.length){$('#f-view').querySelector('option[value=island]').remove();}
 function fillAreas(){const sel=$('#f-area'); sel.innerHTML='<option value="">All areas</option>'; const vr=viewRows();
-  const names=[...new Set(vr.map(r=>r.area).filter(Boolean))].sort(); names.forEach(a=>{const o=document.createElement('option');o.value=a;o.textContent=(st.view==='region'? (CITY[vr.find(r=>r.area===a).city||'vancouver']||{}).label+' · ' : '')+a;sel.appendChild(o);});
+  const names=[...new Set(vr.map(r=>r.area).filter(Boolean))].sort(); names.forEach(a=>{const o=document.createElement('option');o.value=a;o.textContent=(isRegion(st.view)? (CITY[vr.find(r=>r.area===a).city||'vancouver']||{}).label+' · ' : '')+a;sel.appendChild(o);});
   sel.value = names.includes(st.area)? st.area : (st.area='');}
 fillAreas();
 $('#f-view').value=st.view; $('#f-q').value=st.q; $('#f-budget').value=st.budget; $('#f-min').value=st.min; $('#f-max').value=st.max; $('#f-margin').value=st.margin*100; $('#f-sort').value=st.sort;
@@ -198,9 +206,9 @@ document.querySelectorAll('#f-zones .chip[data-g]').forEach(b=>b.setAttribute('a
 $('#f-listed').setAttribute('aria-pressed',st.listed);
 function setHeader(){
   const c=CITY[st.view];
-  if(st.view==='region'){ const n=CITIES.reduce((a,c)=>a+c.parcels,0);
-    $('#h1').textContent='Metro Vancouver Redevelopment Screener'; $('#eyebrow').textContent='Metro Vancouver · '+CITIES.length+' municipalities · fee-simple parcels · outright zoning';
-    $('#meta').innerHTML=`${int(n)} parcels screened across ${CITIES.map(c=>c.label).join(', ')} · built ${DATA.generated}`;
+  if(isRegion(st.view)){ const vc=viewCities(); const n=vc.reduce((a,c)=>a+c.parcels,0); const rl=REGIONS[st.view].label;
+    $('#h1').textContent=rl+' Redevelopment Screener'; $('#eyebrow').textContent=rl+' · '+vc.length+' municipalities · fee-simple parcels · outright zoning';
+    $('#meta').innerHTML=`${int(n)} parcels screened across ${vc.map(c=>c.label).join(', ')} (${CITIES.length} municipalities in all — switch the view for Greater Victoria, Abbotsford or Whistler) · built ${DATA.generated}`;
   } else {
     $('#h1').textContent=c.label+' Redevelopment Screener'; $('#eyebrow').textContent=(c.code==='vancouver'?'City of Vancouver':c.label)+' · fee-simple parcels · outright zoning';
     $('#meta').innerHTML=(c.code==='vancouver'? `Assessment roll 2026 · ${int(c.parcels)} parcels screened` : `${int(c.parcels)} fee-simple parcels (ParcelMap BC) · land values modelled (grade ${c.grade_land}) · zoning grade ${c.grade_zoning}`)+` · built ${DATA.generated}`;
@@ -230,13 +238,13 @@ function render(){
   const t100=cur.slice(0,100);
   const listedN=t100.filter(r=>r.listed).length;
   const vr=viewRows();
-  const byCity = st.view==='region' ? CITIES.map(c=>c.label.replace('North Vancouver','N. Van')+' '+int(t100.filter(r=>(r.city||'vancouver')===c.code).length)).join(' · ') : null;
+  const byCity = isRegion(st.view) ? viewCities().map(c=>c.label.replace('North Vancouver','N. Van')+' '+int(t100.filter(r=>(r.city||'vancouver')===c.code).length)).join(' · ') : null;
   $('#kpis').innerHTML = [
     ['Sites passing filters', int(cur.length), `of ${int(vr.length)} with a non-negative margin`],
-    ['Median profit, top 100', money(med(t100.map(r=>r.profit))), vanView()? 'at assessed value ×'+DATA.assumptions.market_over_assessed : (st.view==='region'? 'assessed (Vancouver) or modelled lot value' : 'at modelled lot value (HPI × lot size)')],
+    ['Median profit, top 100', money(med(t100.map(r=>r.profit))), vanView()? 'at assessed value ×'+DATA.assumptions.market_over_assessed : (isRegion(st.view)? 'assessed or modelled lot value by city' : 'at modelled lot value (HPI × lot size)')],
     ['Median margin, top 100', pct(med(t100.map(r=>r.margin))), `target ≥ ${pct(DATA.assumptions.target_margin)} on cost`],
     [vanView()? 'Median assessed, top 100' : 'Median acquisition, top 100', money(med(t100.map(r=>r.assessed))), vanView()? 'land + improvements, 2026 roll' : 'lot value modelled from GVR HPI benchmark'],
-    st.view==='region' ? ['Top 100 by city', int(t100.length), byCity] :
+    isRegion(st.view) ? ['Top 100 by city', int(t100.length), byCity] :
     ['Listed for sale', int(cur.filter(r=>r.listed).length), listedN? int(listedN)+' in this top 100 · REW.ca, '+DATA.generated : (vanView()? 'none matched in this view' : 'listings only matched for Vancouver')],
   ].map(([l,v,s])=>`<div class="kpi"><div class="eyebrow">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
   // table
@@ -248,7 +256,7 @@ function render(){
     const atAsk = st.listed && r.listed && r.ask_profit!=null;
     const p = basis? r.toa_profit : atAsk? r.ask_profit : r.profit, m = basis? r.toa_margin : atAsk? r.ask_margin : r.margin;
     tr.innerHTML = `<td class="rank num">${i+1}</td>
-      <td class="addr"><strong>${r.address}</strong>${r.listed?'<span class="tag listed">Listed</span>':''}${r.stacked>1?'<span class="tag">'+r.stacked+' parcels</span>':''}${!isVan(r)&&(r.land_grade==='D'||r.grade==='D')?'<span class="tag" title="placeholder input, verify">grade D</span>':''}<span class="sub">${st.view==='region'&&CITY[r.city||'vancouver']? CITY[r.city||'vancouver'].label+' · ':''}${r.area}${r.postal?' · '+r.postal:''}${r.year_built?' · built '+r.year_built:''}</span></td>
+      <td class="addr"><strong>${r.address}</strong>${r.listed?'<span class="tag listed">Listed</span>':''}${r.stacked>1?'<span class="tag">'+r.stacked+' parcels</span>':''}${!isVan(r)&&(r.land_grade==='D'||r.grade==='D')?'<span class="tag" title="placeholder input, verify">grade D</span>':''}<span class="sub">${isRegion(st.view)&&CITY[r.city||'vancouver']? CITY[r.city||'vancouver'].label+' · ':''}${r.area}${r.postal?' · '+r.postal:''}${r.year_built?' · built '+r.year_built:''}</span></td>
       <td><span class="dot" style="background:${GCOL[r.group]}"></span>${r.zone}<span class="sub">${basis? r.toa_tier+' · '+r.toa_fsr.toFixed(1)+' FSR rental' : r.fsr.toFixed(2)+' FSR · '+TYPO[r.typology].label}</span></td>
       <td class="r num">${int(r.site_m2)}</td>
       <td class="r num">${atAsk? money(r.list_price)+'<span class="sub">asking · assessed '+money(r.assessed)+'</span>' : money(r.assessed)+(!isVan(r)?'<span class="sub">modelled · '+r.land_grade+'</span>':'')}</td>
@@ -260,7 +268,7 @@ function render(){
     tb.appendChild(tr);
   });
   $('#tbl-title').textContent = `Top ${Math.min(st.shown,cur.length)}`+(st.listed?' listed for sale':'');
-  $('#th-price').textContent = st.listed? 'Asking' : (vanView()? 'Assessed' : (st.view==='region'? 'Assessed / modelled' : 'Lot value (modelled)'));
+  $('#th-price').textContent = st.listed? 'Asking' : (vanView()? 'Assessed' : (isRegion(st.view)? 'Assessed / modelled' : 'Lot value (modelled)'));
   $('#tbl-sub').textContent = st.sort==='profit'?'ranked by modelled profit': st.sort==='margin'?'ranked by margin on cost': st.sort==='rlvx'?'ranked by max land price ÷ assessed value':'best of outright zoning or TOA rezoning';
   $('#more').hidden = cur.length<=st.shown;
   drawMap(top);
@@ -276,17 +284,22 @@ const tip=$('#tip');
 let X=()=>0, Y=()=>0, mapView=null;
 function buildMap(){
   if(mapView===st.view) return; mapView=st.view; base.innerHTML='';
-  const areas0=DATA.areas.filter(a=>st.view==='region' || (a.city||'vancouver')===st.view); const areas=areas0.length?areas0:DATA.areas;
-  const allLon=areas.flatMap(a=>a.rings.flat().map(p=>p[0])), allLat=areas.flatMap(a=>a.rings.flat().map(p=>p[1]));
-  const lon0=Math.min(...allLon), lon1=Math.max(...allLon), lat0=Math.min(...allLat), lat1=Math.max(...allLat);
+  const areas=DATA.areas.filter(a=>inView(a.city||'vancouver'));
+  // bounds: the view's outlines, or (for a city without a published outline) its scored parcels with a margin
+  const vr=viewRows().filter(r=>r.lat!=null);
+  let allLon=areas.flatMap(a=>a.rings.flat().map(p=>p[0])), allLat=areas.flatMap(a=>a.rings.flat().map(p=>p[1]));
+  if(!allLon.length){allLon=vr.map(r=>r.lon); allLat=vr.map(r=>r.lat);}
+  if(!allLon.length){allLon=[-123.3,-122.9]; allLat=[49.15,49.35];}
+  const pad=allLon.length>2?0.004:0.05;
+  const lon0=Math.min(...allLon)-pad, lon1=Math.max(...allLon)+pad, lat0=Math.min(...allLat)-pad, lat1=Math.max(...allLat)+pad;
   const k=Math.cos(49.25*Math.PI/180); const sx=(W-20)/((lon1-lon0)*k), sy=(H-20)/(lat1-lat0); const s=Math.min(sx,sy);
   const ox=(W-(lon1-lon0)*k*s)/2, oy=(H-(lat1-lat0)*s)/2;
   X=lon=>ox+(lon-lon0)*k*s; Y=lat=>H-oy-(lat-lat0)*s;
   areas.forEach(a=>{a.rings.forEach(r=>{const d=r.map((p,i)=>(i?'L':'M')+X(p[0]).toFixed(1)+' '+Y(p[1]).toFixed(1)).join('')+'Z';const p=el('path',{d,fill:'var(--surface-2)',stroke:'var(--bg)','stroke-width':1.2});p.appendChild(Object.assign(document.createElementNS(NS,'title'),{textContent:a.name}));base.appendChild(p);});
     const pts=a.rings[0]; const cx=pts.reduce((q,p)=>q+X(p[0]),0)/pts.length, cy=pts.reduce((q,p)=>q+Y(p[1]),0)/pts.length;
     const isCity=(a.city||'vancouver')!=='vancouver';
-    if(a.rings[0].length>8 && (st.view!=='region' || isCity)){const t=el('text',{x:cx,y:cy,'text-anchor':'middle','font-size':isCity?9:8,fill:'var(--muted)','font-family':'IBM Plex Sans, sans-serif'});t.textContent=a.name.replace('Kensington-Cedar Cottage','Kensington-C.C.').replace('Renfrew-Collingwood','Renfrew-Coll.').replace('Dunbar-Southlands','Dunbar').replace('Grandview-Woodland','Grandview').replace('Victoria-Fraserview','Vic-Fraserview');base.appendChild(t);}});
-  if(st.view==='region'){const t=el('text',{x:X(-123.12),y:Y(49.25),'text-anchor':'middle','font-size':9,fill:'var(--muted)','font-family':'IBM Plex Sans, sans-serif'});t.textContent='Vancouver';base.appendChild(t);}
+    if(a.rings[0].length>8 && (!isRegion(st.view) || isCity)){const t=el('text',{x:cx,y:cy,'text-anchor':'middle','font-size':isCity?9:8,fill:'var(--muted)','font-family':'IBM Plex Sans, sans-serif'});t.textContent=a.name.replace('Kensington-Cedar Cottage','Kensington-C.C.').replace('Renfrew-Collingwood','Renfrew-Coll.').replace('Dunbar-Southlands','Dunbar').replace('Grandview-Woodland','Grandview').replace('Victoria-Fraserview','Vic-Fraserview');base.appendChild(t);}});
+  if(st.view==='region'&&CITY.vancouver){const t=el('text',{x:X(-123.12),y:Y(49.25),'text-anchor':'middle','font-size':9,fill:'var(--muted)','font-family':'IBM Plex Sans, sans-serif'});t.textContent='Vancouver';base.appendChild(t);}
   DATA.stations.forEach(z=>{ if(X(z.lon)<0||X(z.lon)>W||Y(z.lat)<0||Y(z.lat)>H) return; base.appendChild(el('rect',{x:X(z.lon)-2.5,y:Y(z.lat)-2.5,width:5,height:5,fill:'var(--muted)',rx:1}));});
 }
 function drawMap(top){
