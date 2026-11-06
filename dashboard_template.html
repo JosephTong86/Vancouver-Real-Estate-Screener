@@ -1,5 +1,7 @@
 <title>Vancouver Redevelopment Screener</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" crossorigin="">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin=""></script>
 <style>
 :root{
   color-scheme:light;
@@ -54,7 +56,15 @@ header p{margin:6px 0 0;color:var(--ink-2);max-width:68ch}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow)}
 .panel .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
 .panel .hd h2{font-size:15px;font-weight:600}
-#map{display:block;width:100%;height:auto;aspect-ratio:1.18;max-width:100%}
+#map{display:block;width:100%;height:520px;max-width:100%;background:var(--surface-2);border-radius:0 0 8px 8px}
+@media (max-width:960px){#map{height:420px}}
+#map .leaflet-tile-pane{filter:grayscale(1) contrast(.9) brightness(1.04)}
+@media (prefers-color-scheme:dark){#map .leaflet-tile-pane{filter:grayscale(1) invert(1) contrast(.85) brightness(.9)}}
+#map .leaflet-control-attribution{font-size:10px;background:rgba(255,255,255,.7)}
+#map .leaflet-popup-content{font:12px/1.4 "IBM Plex Sans",sans-serif;margin:8px 10px}
+#map .leaflet-container{font-family:"IBM Plex Sans",sans-serif}
+.maptools{display:flex;gap:6px;align-items:center}
+.maptools .btn{font-size:11px;padding:3px 8px}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;padding:10px 14px;font-size:12px;color:var(--ink-2);border-top:1px solid var(--line)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
 .tablewrap{overflow-x:auto}
@@ -106,7 +116,7 @@ details.notes td,details.notes th{padding:4px 10px;cursor:default;position:stati
 </header>
 
 <section class="controls" aria-label="Filters">
-  <div class="ctl"><label for="f-view">View</label><select id="f-view"><option value="region">Metro Vancouver (region)</option><option value="island">Greater Victoria (region)</option></select></div>
+  <div class="ctl"><label for="f-view">View</label><select id="f-view"><option value="region">Metro Vancouver (region)</option><option value="island">Greater Victoria (region)</option><option value="all">All regions (everything)</option></select></div>
   <div class="ctl"><label for="f-q">Search address / zone</label><input type="text" id="f-q" placeholder="e.g. Broadway, C-2A, Kitsilano"></div>
   <div class="ctl"><label for="f-budget" id="lbl-budget">Max assessed value</label>
     <select id="f-budget"><option value="">Any budget</option><option value="2000000">≤ $2M</option><option value="3000000">≤ $3M</option><option value="5000000">≤ $5M</option><option value="10000000">≤ $10M</option><option value="25000000">≤ $25M</option></select></div>
@@ -137,9 +147,9 @@ details.notes td,details.notes th{padding:4px 10px;cursor:default;position:stati
 <div class="main">
   <div>
     <div class="panel">
-      <div class="hd"><h2>Where the top 100 sit</h2><span class="meta">dot size = modelled profit</span></div>
-      <svg id="map" viewBox="0 0 600 508" role="img" aria-label="Map of Vancouver local areas with the ranked sites"></svg>
-      <div class="legend"><span><i style="background:var(--g)"></i>Ground-oriented (multiplex, townhouse)</span><span><i style="background:var(--w)"></i>Wood-frame apartment (4–6 st)</span><span><i style="background:var(--c)"></i>Concrete mid-rise / tower</span><span><i style="background:var(--muted);border-radius:1px"></i>SkyTrain station</span></div>
+      <div class="hd"><h2>Where the top 100 sit</h2><span class="maptools"><span class="meta">dot size = modelled profit · scroll to zoom, drag to pan</span><button class="btn" id="map-fit" type="button" title="Fit the map to the current view">Fit</button></span></div>
+      <div id="map" role="region" aria-label="Map of the ranked sites with municipal outlines"></div>
+      <div class="legend"><span><i style="background:var(--g)"></i>Ground-oriented (multiplex, townhouse)</span><span><i style="background:var(--w)"></i>Wood-frame apartment (4–6 st)</span><span><i style="background:var(--c)"></i>Concrete mid-rise / tower</span><span><i style="background:var(--muted)"></i>SkyTrain station / bus exchange</span></div>
     </div>
     <div class="panel" id="detail" hidden></div>
   </div>
@@ -181,7 +191,8 @@ const GRADE_TXT = {A:'A · bylaw / assessment roll',B:'B · city bulletin or sec
 // regional views: Metro Vancouver (default) and Greater Victoria; Abbotsford and Whistler are per-city only
 const ISLAND=['victoria','saanich','oakbay','esquimalt','langford','colwood','viewroyal'];
 const REGIONS={region:{label:'Metro Vancouver',cities:CITIES.filter(c=>!ISLAND.includes(c.code)&&!['abbotsford','whistler'].includes(c.code)).map(c=>c.code)},
-               island:{label:'Greater Victoria',cities:CITIES.filter(c=>ISLAND.includes(c.code)).map(c=>c.code)}};
+               island:{label:'Greater Victoria',cities:CITIES.filter(c=>ISLAND.includes(c.code)).map(c=>c.code)},
+               all:{label:'All regions',cities:CITIES.map(c=>c.code)}};
 const isRegion = v => !!REGIONS[v];
 const inView = code => isRegion(st.view) ? REGIONS[st.view].cities.includes(code) : code===st.view;
 const viewCities = () => isRegion(st.view) ? CITIES.filter(c=>REGIONS[st.view].cities.includes(c.code)) : CITIES.filter(c=>c.code===st.view);
@@ -193,8 +204,8 @@ const viewRows = () => rows.filter(r=>inView(r.city||'vancouver'));
 const vanView = () => st.view==='vancouver';
 
 // populate view + area selects
-CITIES.forEach(c=>{const o=document.createElement('option');o.value=c.code;o.textContent=c.label+(c.code==='vancouver'?' (assessed values)':' (modelled values)');$('#f-view').appendChild(o);});
-if(!multi){$('#f-view').querySelector('option[value=region]').remove();$('#f-view').querySelector('option[value=island]').remove();}
+CITIES.forEach(c=>{const o=document.createElement('option');o.value=c.code;o.textContent=c.label+(c.grade_land==='A'?' (assessed values)':' (modelled values)');$('#f-view').appendChild(o);});
+if(!multi){['region','island','all'].forEach(v=>$('#f-view').querySelector('option[value='+v+']').remove());}
 if(!REGIONS.island.cities.length){$('#f-view').querySelector('option[value=island]').remove();}
 function fillAreas(){const sel=$('#f-area'); sel.innerHTML='<option value="">All areas</option>'; const vr=viewRows();
   const names=[...new Set(vr.map(r=>r.area).filter(Boolean))].sort(); names.forEach(a=>{const o=document.createElement('option');o.value=a;o.textContent=(isRegion(st.view)? (CITY[vr.find(r=>r.area===a).city||'vancouver']||{}).label+' · ' : '')+a;sel.appendChild(o);});
@@ -211,7 +222,7 @@ function setHeader(){
     $('#meta').innerHTML=`${int(n)} parcels screened across ${vc.map(c=>c.label).join(', ')} (${CITIES.length} municipalities in all — switch the view for Greater Victoria, Abbotsford or Whistler) · built ${DATA.generated}`;
   } else {
     $('#h1').textContent=c.label+' Redevelopment Screener'; $('#eyebrow').textContent=(c.code==='vancouver'?'City of Vancouver':c.label)+' · fee-simple parcels · outright zoning';
-    $('#meta').innerHTML=(c.code==='vancouver'? `Assessment roll 2026 · ${int(c.parcels)} parcels screened` : `${int(c.parcels)} fee-simple parcels (ParcelMap BC) · land values modelled (grade ${c.grade_land}) · zoning grade ${c.grade_zoning}`)+` · built ${DATA.generated}`;
+    $('#meta').innerHTML=(c.code==='vancouver'? `Assessment roll 2026 · ${int(c.parcels)} parcels screened` : `${int(c.parcels)} fee-simple parcels · land values: ${c.value_basis||'modelled'} (grade ${c.grade_land}) · zoning grade ${c.grade_zoning}`)+` · built ${DATA.generated}`;
   }
   $('#lbl-budget').textContent = vanView()? 'Max assessed value' : 'Max acquisition value';
 }
@@ -241,9 +252,9 @@ function render(){
   const byCity = isRegion(st.view) ? viewCities().map(c=>c.label.replace('North Vancouver','N. Van')+' '+int(t100.filter(r=>(r.city||'vancouver')===c.code).length)).join(' · ') : null;
   $('#kpis').innerHTML = [
     ['Sites passing filters', int(cur.length), `of ${int(vr.length)} with a non-negative margin`],
-    ['Median profit, top 100', money(med(t100.map(r=>r.profit))), vanView()? 'at assessed value ×'+DATA.assumptions.market_over_assessed : (isRegion(st.view)? 'assessed or modelled lot value by city' : 'at modelled lot value (HPI × lot size)')],
+    ['Median profit, top 100', money(med(t100.map(r=>r.profit))), vanView()? 'at assessed value ×'+DATA.assumptions.market_over_assessed : (isRegion(st.view)? 'assessed or modelled lot value by city' : (CITY[st.view]&&CITY[st.view].grade_land==='A'? 'at assessed value ×'+DATA.assumptions.market_over_assessed : 'at modelled lot value (HPI × lot size)'))],
     ['Median margin, top 100', pct(med(t100.map(r=>r.margin))), `target ≥ ${pct(DATA.assumptions.target_margin)} on cost`],
-    [vanView()? 'Median assessed, top 100' : 'Median acquisition, top 100', money(med(t100.map(r=>r.assessed))), vanView()? 'land + improvements, 2026 roll' : 'lot value modelled from GVR HPI benchmark'],
+    [vanView()? 'Median assessed, top 100' : 'Median acquisition, top 100', money(med(t100.map(r=>r.assessed))), vanView()||(CITY[st.view]&&CITY[st.view].grade_land==='A')? 'land + improvements, 2026 roll' : 'lot value modelled from MLS HPI benchmark'],
     isRegion(st.view) ? ['Top 100 by city', int(t100.length), byCity] :
     ['Listed for sale', int(cur.filter(r=>r.listed).length), listedN? int(listedN)+' in this top 100 · REW.ca, '+DATA.generated : (vanView()? 'none matched in this view' : 'listings only matched for Vancouver')],
   ].map(([l,v,s])=>`<div class="kpi"><div class="eyebrow">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
@@ -259,11 +270,11 @@ function render(){
       <td class="addr"><strong>${r.address}</strong>${r.listed?'<span class="tag listed">Listed</span>':''}${r.stacked>1?'<span class="tag">'+r.stacked+' parcels</span>':''}${!isVan(r)&&(r.land_grade==='D'||r.grade==='D')?'<span class="tag" title="placeholder input, verify">grade D</span>':''}<span class="sub">${isRegion(st.view)&&CITY[r.city||'vancouver']? CITY[r.city||'vancouver'].label+' · ':''}${r.area}${r.postal?' · '+r.postal:''}${r.year_built?' · built '+r.year_built:''}</span></td>
       <td><span class="dot" style="background:${GCOL[r.group]}"></span>${r.zone}<span class="sub">${basis? r.toa_tier+' · '+r.toa_fsr.toFixed(1)+' FSR rental' : r.fsr.toFixed(2)+' FSR · '+TYPO[r.typology].label}</span></td>
       <td class="r num">${int(r.site_m2)}</td>
-      <td class="r num">${atAsk? money(r.list_price)+'<span class="sub">asking · assessed '+money(r.assessed)+'</span>' : money(r.assessed)+(!isVan(r)?'<span class="sub">modelled · '+r.land_grade+'</span>':'')}</td>
+      <td class="r num">${atAsk? money(r.list_price)+'<span class="sub">asking · assessed '+money(r.assessed)+'</span>' : money(r.assessed)+(!isVan(r)?'<span class="sub">'+(r.land_grade==='A'?'assessed':'modelled')+' · '+r.land_grade+'</span>':'')}</td>
       <td class="r num">${int(basis? r.site_m2*10.7639*r.toa_fsr : r.gfa)}</td>
       <td class="r num ${p>=0?'pos':'neg'}">${money(p)}</td>
       <td class="r num ${m>=0?'pos':'neg'}">${pct(m)}</td>
-      <td class="r num">${money(r.rlv)}<span class="sub">${r.rlv&&r.assessed? (r.rlv/r.assessed).toFixed(2)+(isVan(r)?'× assessed':'× modelled'):''}</span></td>`;
+      <td class="r num">${money(r.rlv)}<span class="sub">${r.rlv&&r.assessed? (r.rlv/r.assessed).toFixed(2)+(isVan(r)||r.land_grade==='A'?'× assessed':'× modelled'):''}</span></td>`;
     tr.addEventListener('click',()=>select(r)); tr.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(r);}});
     tb.appendChild(tr);
   });
@@ -275,52 +286,61 @@ function render(){
 }
 
 // ---------- map
-const svg=$('#map'); const W=600,H=508;
-const NS='http://www.w3.org/2000/svg';
-function el(n,a){const e=document.createElementNS(NS,n);for(const q in a)e.setAttribute(q,a[q]);return e;}
-const base=el('g',{}); svg.appendChild(base);
-const dots=el('g',{}); svg.appendChild(dots);
+// ---------- map (Leaflet; OpenStreetMap tiles; pan / scroll-zoom; outlines for every municipality)
 const tip=$('#tip');
-let X=()=>0, Y=()=>0, mapView=null;
+const HAS_MAP = typeof L !== 'undefined';
+if(!HAS_MAP){ $('#map').innerHTML='<p style="padding:24px 16px;color:var(--muted);font-size:13px">The map library could not be loaded (offline or blocked). The table and filters still work.</p>'; }
+const map=HAS_MAP? L.map('map',{scrollWheelZoom:true,zoomSnap:0.25,preferCanvas:true,attributionControl:true}) : null;
+if(HAS_MAP) L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+const outlines=HAS_MAP?L.layerGroup().addTo(map):null, stationLayer=HAS_MAP?L.layerGroup().addTo(map):null, dotLayer=HAS_MAP?L.layerGroup().addTo(map):null;
+const markerOf=new Map(); let mapView=null, viewBounds=null;
+const cityBounds={};   // code -> LatLngBounds of its outline (or of its rows)
+function boundsFor(codes){
+  let bb=null;
+  codes.forEach(c=>{const b=cityBounds[c]; if(b&&b.isValid()){bb=bb?bb.extend(b):L.latLngBounds(b.getSouthWest(),b.getNorthEast());}});
+  return bb;
+}
 function buildMap(){
-  if(mapView===st.view) return; mapView=st.view; base.innerHTML='';
-  const areas=DATA.areas.filter(a=>inView(a.city||'vancouver'));
-  // bounds: the view's outlines, or (for a city without a published outline) its scored parcels with a margin
-  const vr=viewRows().filter(r=>r.lat!=null);
-  let allLon=areas.flatMap(a=>a.rings.flat().map(p=>p[0])), allLat=areas.flatMap(a=>a.rings.flat().map(p=>p[1]));
-  if(!allLon.length){allLon=vr.map(r=>r.lon); allLat=vr.map(r=>r.lat);}
-  if(!allLon.length){allLon=[-123.3,-122.9]; allLat=[49.15,49.35];}
-  const pad=allLon.length>2?0.004:0.05;
-  const lon0=Math.min(...allLon)-pad, lon1=Math.max(...allLon)+pad, lat0=Math.min(...allLat)-pad, lat1=Math.max(...allLat)+pad;
-  const k=Math.cos(49.25*Math.PI/180); const sx=(W-20)/((lon1-lon0)*k), sy=(H-20)/(lat1-lat0); const s=Math.min(sx,sy);
-  const ox=(W-(lon1-lon0)*k*s)/2, oy=(H-(lat1-lat0)*s)/2;
-  X=lon=>ox+(lon-lon0)*k*s; Y=lat=>H-oy-(lat-lat0)*s;
-  areas.forEach(a=>{a.rings.forEach(r=>{const d=r.map((p,i)=>(i?'L':'M')+X(p[0]).toFixed(1)+' '+Y(p[1]).toFixed(1)).join('')+'Z';const p=el('path',{d,fill:'var(--surface-2)',stroke:'var(--bg)','stroke-width':1.2});p.appendChild(Object.assign(document.createElementNS(NS,'title'),{textContent:a.name}));base.appendChild(p);});
-    const pts=a.rings[0]; const cx=pts.reduce((q,p)=>q+X(p[0]),0)/pts.length, cy=pts.reduce((q,p)=>q+Y(p[1]),0)/pts.length;
-    const isCity=(a.city||'vancouver')!=='vancouver';
-    if(a.rings[0].length>8 && (!isRegion(st.view) || isCity)){const t=el('text',{x:cx,y:cy,'text-anchor':'middle','font-size':isCity?9:8,fill:'var(--muted)','font-family':'IBM Plex Sans, sans-serif'});t.textContent=a.name.replace('Kensington-Cedar Cottage','Kensington-C.C.').replace('Renfrew-Collingwood','Renfrew-Coll.').replace('Dunbar-Southlands','Dunbar').replace('Grandview-Woodland','Grandview').replace('Victoria-Fraserview','Vic-Fraserview');base.appendChild(t);}});
-  if(st.view==='region'&&CITY.vancouver){const t=el('text',{x:X(-123.12),y:Y(49.25),'text-anchor':'middle','font-size':9,fill:'var(--muted)','font-family':'IBM Plex Sans, sans-serif'});t.textContent='Vancouver';base.appendChild(t);}
-  DATA.stations.forEach(z=>{ if(X(z.lon)<0||X(z.lon)>W||Y(z.lat)<0||Y(z.lat)>H) return; base.appendChild(el('rect',{x:X(z.lon)-2.5,y:Y(z.lat)-2.5,width:5,height:5,fill:'var(--muted)',rx:1}));});
+  if(!HAS_MAP || mapView===st.view) return; mapView=st.view;
+  outlines.clearLayers(); stationLayer.clearLayers();
+  // outlines: Vancouver local areas + municipal hulls, muted unless in the current view
+  DATA.areas.forEach(a=>{
+    const code=a.city||'vancouver', inv=inView(code);
+    const latlngs=a.rings.map(r=>r.map(p=>[p[1],p[0]]));
+    const poly=L.polygon(latlngs,{color: inv?'#6b7280':'#9ca3af', weight: code==='vancouver'?0.8:1.2, fill:true, fillColor: inv?'#9ca3af':'#d1d5db', fillOpacity: inv?0.10:0.06, interactive:true});
+    poly.bindTooltip(((CITY[code]||{}).label||'Vancouver')+(code==='vancouver'?' · '+a.name:''),{sticky:true,direction:'top',opacity:.9});
+    poly.addTo(outlines);
+    if(!cityBounds[code]) cityBounds[code]=L.latLngBounds([]);
+    cityBounds[code].extend(poly.getBounds());
+  });
+  // cities without a published outline: bounds from their scored parcels
+  CITIES.forEach(c=>{ if(cityBounds[c.code]&&cityBounds[c.code].isValid()) return; const pts=rows.filter(r=>(r.city||'vancouver')===c.code&&r.lat!=null).map(r=>[r.lat,r.lon]); if(pts.length) cityBounds[c.code]=L.latLngBounds(pts).pad(0.05); });
+  // stations (SkyTrain squares, bus exchanges as hollow squares)
+  DATA.stations.forEach(z=>{ const bus=(z.kind||'skytrain')!=='skytrain'; L.circleMarker([z.lat,z.lon],{radius:bus?3:3.5,color:'#4b5563',weight:1.2,fill:!bus,fillColor:'#4b5563',fillOpacity:.9}).bindTooltip(z.n+(bus?' (bus exchange)':' (SkyTrain)'),{direction:'top'}).addTo(stationLayer); });
+  const codes = isRegion(st.view) ? REGIONS[st.view].cities : [st.view];
+  viewBounds = boundsFor(codes) || L.latLngBounds([[49.15,-123.3],[49.35,-122.9]]);
+  map.fitBounds(viewBounds,{padding:[12,12],animate:false});
 }
 function drawMap(top){
+  if(!HAS_MAP) return;
   buildMap();
-  dots.innerHTML='';
+  dotLayer.clearLayers(); markerOf.clear();
   const maxP=Math.max(1,...top.map(r=>Math.max(r.profit,r.toa_profit||0)));
   [...top].reverse().forEach((r,ri)=>{ if(r.lat==null) return;
     const i=top.length-1-ri; const p=Math.max(r.profit, st.sort==='best'&&r.toa_profit!=null?r.toa_profit:-Infinity);
-    const rad=3+9*Math.sqrt(Math.max(0,p)/maxP);
-    const c=el('circle',{cx:X(r.lon),cy:Y(r.lat),r:rad,fill:GCOL[r.group],'fill-opacity':.78,stroke:st.sel===r?'var(--ink)':'var(--surface)','stroke-width':st.sel===r?2.5:1.2,tabindex:-1});
-    c.style.cursor='pointer';
-    c.addEventListener('mousemove',e=>{tip.hidden=false;tip.innerHTML=`<strong>#${i+1} ${r.address}</strong><br>${r.zone} · ${r.fsr.toFixed(2)} FSR · ${money(r.profit)} (${pct(r.margin)})`;tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY+12)+'px';});
-    c.addEventListener('mouseleave',()=>tip.hidden=true);
-    c.addEventListener('click',()=>select(r));
-    dots.appendChild(c);
+    const rad=4+10*Math.sqrt(Math.max(0,p)/maxP);
+    const c=L.circleMarker([r.lat,r.lon],{radius:rad,color: st.sel===r?'#111827':'#ffffff',weight: st.sel===r?2.5:1.2,fillColor:GCOL[r.group],fillOpacity:.8});
+    c.bindTooltip(`<strong>#${i+1} ${r.address}</strong><br>${(CITY[r.city||'vancouver']||{}).label||'Vancouver'} · ${r.zone} · ${r.fsr.toFixed(2)} FSR<br>${money(r.profit)} (${pct(r.margin)})`,{direction:'top',opacity:.95});
+    c.on('click',()=>select(r));
+    c.addTo(dotLayer); markerOf.set(r,c);
   });
 }
+function flyTo(r){ if(HAS_MAP&&r&&r.lat!=null){ map.flyTo([r.lat,r.lon], Math.max(map.getZoom(),15),{duration:.6}); const m=markerOf.get(r); if(m) m.openTooltip(); } }
+$('#map-fit').addEventListener('click',()=>{ if(HAS_MAP&&viewBounds) map.fitBounds(viewBounds,{padding:[12,12]}); });
 
 // ---------- detail
 function select(r){
-  st.sel=r; const d=$('#detail'); d.hidden=false;
+  st.sel=r; const d=$('#detail'); d.hidden=false; flyTo(r);
   const van=isVan(r); const cl=(CITY[r.city||'vancouver']||{}).label||'Vancouver';
   const parts=[[van?'Acquisition (assessed ×'+DATA.assumptions.market_over_assessed+', PTT, demo, carry)':'Acquisition (modelled lot value, PTT, demo, carry)',r.acquisition],['Hard construction',r.hard],['Soft costs',r.soft],['Levies, DCCs & inclusionary',r.levies]];
   const cols=['var(--ink-2)','var(--line-2)','var(--muted)','var(--warn)'];

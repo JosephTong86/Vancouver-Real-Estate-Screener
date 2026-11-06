@@ -209,6 +209,15 @@ payload = {"cols": COLS, "rows": rows, "areas": areas, "stations": stations, "su
 
 tpl = open(os.path.join(HERE, "dashboard_template.html"), encoding="utf-8").read()
 html = tpl.replace("/*__DATA__*/", "const DATA=" + json.dumps(payload, separators=(",", ":")) + ";")
+# Leaflet: inline the vendored copy (vendor/leaflet.{js,css}, fetched in CI) so the page has no runtime CDN dependency;
+# the CDN tags stay as the fallback when the vendored files are absent
+vjs, vcss = os.path.join(HERE, "vendor", "leaflet.js"), os.path.join(HERE, "vendor", "leaflet.css")
+if os.path.exists(vjs) and os.path.exists(vcss):
+    css = open(vcss, encoding="utf-8").read()
+    js = open(vjs, encoding="utf-8").read().replace("</script", "<\\/script")
+    html = html.replace('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" crossorigin="">', "<style>" + css + "</style>")
+    html = html.replace('<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin=""></script>', "<script>" + js + "</script>")
+    print("  leaflet inlined from vendor/")
 out = os.path.join(HERE, "output", "dashboard.html")
 open(out, "w", encoding="utf-8").write(html)
 print(f"wrote {out}: {len(rows):,} rows across {len(cities)} municipalities, {os.path.getsize(out)/1e6:.1f} MB")
