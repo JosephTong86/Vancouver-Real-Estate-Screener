@@ -123,7 +123,7 @@ details.notes td,details.notes th{padding:4px 10px;cursor:default;position:stati
   <div class="ctl"><label for="f-area">Local area</label><select id="f-area"><option value="">All areas</option></select></div>
   <div class="ctl"><label for="f-min">Site size m² (min – max)</label>
     <div style="display:flex;gap:6px"><input type="number" id="f-min" placeholder="min" min="0" step="50"><input type="number" id="f-max" placeholder="max" min="0" step="50"></div></div>
-  <div class="ctl"><label for="f-margin">Min margin on cost: <span id="f-margin-v" class="num">15%</span></label><input type="range" id="f-margin" min="0" max="60" step="5" value="15"></div>
+  <div class="ctl"><label for="f-margin">Min margin on cost: <span id="f-margin-v" class="num">15%</span></label><input type="range" id="f-margin" min="-30" max="60" step="5" value="15"></div>
   <div class="ctl"><label for="f-sort">Rank by</label>
     <select id="f-sort"><option value="profit">Profit ($)</option><option value="margin">Margin (% on cost)</option><option value="rlvx">Max land price ÷ assessed</option><option value="best">Best of outright / TOA rezoning</option></select></div>
   <div class="ctl" style="grid-column:1/-1"><label>Zoning family</label>
@@ -264,7 +264,14 @@ function render(){
   ].map(([l,v,s])=>`<div class="kpi"><div class="eyebrow">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
   // table
   const tb=$('#tbl tbody'); tb.innerHTML='';
-  if(!top.length){tb.innerHTML=`<tr><td colspan="9" class="empty">Nothing clears these filters — lower the minimum margin or widen the zoning family.</td></tr>`;}
+  if(!top.length){
+    // empty state: say what the best available site would need, and offer a one-click relax of the margin filter
+    const vr=viewRows(); const best=vr.length? vr.reduce((a,r)=>r.margin>a.margin?r:a, vr[0]) : null;
+    const place=isRegion(st.view)? REGIONS[st.view].label : ((CITY[st.view]||{}).label||'this view');
+    const why = best? `The best modelled margin in ${place} is <strong>${pct(best.margin)}</strong> (${best.address}, ${best.zone}) against your ${pct(st.margin)} minimum` : `No scored sites in ${place}`;
+    tb.innerHTML=`<tr><td colspan="9" class="empty">Nothing clears these filters. ${why}${best&&best.margin<st.margin?' — '+(best.margin>=0?'<button class="btn" id="relax" type="button">Show every site with a positive margin</button>':'<button class="btn" id="relax" type="button">Show the top sites anyway (negative margins)</button>'):''}${!best||best.margin>=st.margin?'. Widen the zoning family or clear the search / area / budget filters.':''}</td></tr>`;
+    const rb=$('#relax'); if(rb) rb.addEventListener('click',()=>{ st.margin = best.margin>=0? 0 : Math.floor(best.margin*100)/100 - 0.05; $('#f-margin').value=Math.round(st.margin*100); $('#f-margin-v').textContent=Math.round(st.margin*100)+'%'; st.shown=TOPN; render(); });
+  }
   top.forEach((r,i)=>{
     const tr=document.createElement('tr'); tr.tabIndex=0; tr.dataset.i=i; tr.setAttribute('aria-selected', st.sel===r);
     const basis = st.sort==='best' && r.toa_profit!=null && r.toa_profit>r.profit;
