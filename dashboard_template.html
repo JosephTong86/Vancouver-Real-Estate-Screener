@@ -147,19 +147,19 @@ details.notes td,details.notes th{padding:4px 10px;cursor:default;position:stati
 <div class="main">
   <div>
     <div class="panel">
-      <div class="hd"><h2>Where the top 100 sit</h2><span class="maptools"><span class="meta">dot size = modelled profit · scroll to zoom, drag to pan</span><button class="btn" id="map-fit" type="button" title="Fit the map to the current view">Fit</button></span></div>
+      <div class="hd"><h2>Where the top 500 sit</h2><span class="maptools"><span class="meta">dot size = modelled profit · scroll to zoom, drag to pan</span><button class="btn" id="map-fit" type="button" title="Fit the map to the current view">Fit</button></span></div>
       <div id="map" role="region" aria-label="Map of the ranked sites with municipal outlines"></div>
       <div class="legend"><span><i style="background:var(--g)"></i>Ground-oriented (multiplex, townhouse)</span><span><i style="background:var(--w)"></i>Wood-frame apartment (4–6 st)</span><span><i style="background:var(--c)"></i>Concrete mid-rise / tower</span><span><i style="background:var(--muted)"></i>SkyTrain station / bus exchange</span></div>
     </div>
     <div class="panel" id="detail" hidden></div>
   </div>
   <div class="panel">
-    <div class="hd"><h2 id="tbl-title">Top 100</h2><span class="meta" id="tbl-sub"></span></div>
+    <div class="hd"><h2 id="tbl-title">Top 500</h2><span class="meta" id="tbl-sub"></span></div>
     <div class="tablewrap"><table id="tbl">
       <thead><tr>
         <th>#</th><th data-k="address">Site</th><th data-k="zone">Zone · build</th><th class="r" data-k="site_m2">Site m²</th><th class="r" data-k="assessed" id="th-price">Assessed</th><th class="r" data-k="gfa">Buildable sf</th><th class="r" data-k="profit">Profit</th><th class="r" data-k="margin">Margin</th><th class="r" data-k="rlv">Max land price</th>
       </tr></thead><tbody></tbody></table></div>
-    <div class="more"><button class="btn" id="more" hidden>Show next 100</button></div>
+    <div class="more"><button class="btn" id="more" hidden>Show next 500</button></div>
   </div>
 </div>
 
@@ -199,9 +199,10 @@ const REGIONS={region:{label:'Metro Vancouver',cities:CITIES.filter(c=>!ISLAND.i
 const isRegion = v => !!REGIONS[v];
 const inView = code => isRegion(st.view) ? REGIONS[st.view].cities.includes(code) : code===st.view;
 const viewCities = () => isRegion(st.view) ? CITIES.filter(c=>REGIONS[st.view].cities.includes(c.code)) : CITIES.filter(c=>c.code===st.view);
+const TOPN = 500;   // rows shown in the table and plotted on the map (per view)
 // ---------- state
-const st = {view: multi?'region':'vancouver', q:'',budget:'',area:'',min:'',max:'',margin:0.15,sort:'profit',zones:new Set(['R1','RT','RM','R345','C','RR']),groups:new Set(['G','W','C']),listed:false,shown:100,sel:null};
-try{const s=JSON.parse(localStorage.getItem('vrs-filters')||'null'); if(s){Object.assign(st,s,{zones:new Set(s.zones),groups:new Set(s.groups),shown:100,sel:null}); if(!CITY[st.view] && !REGIONS[st.view]) st.view=multi?'region':'vancouver';}}catch(e){}
+const st = {view: multi?'region':'vancouver', q:'',budget:'',area:'',min:'',max:'',margin:0.15,sort:'profit',zones:new Set(['R1','RT','RM','R345','C','RR']),groups:new Set(['G','W','C']),listed:false,shown:TOPN,sel:null};
+try{const s=JSON.parse(localStorage.getItem('vrs-filters')||'null'); if(s){Object.assign(st,s,{zones:new Set(s.zones),groups:new Set(s.groups),shown:TOPN,sel:null}); if(!CITY[st.view] && !REGIONS[st.view]) st.view=multi?'region':'vancouver';}}catch(e){}
 function save(){try{localStorage.setItem('vrs-filters',JSON.stringify({...st,zones:[...st.zones],groups:[...st.groups]}));}catch(e){}}
 const viewRows = () => rows.filter(r=>inView(r.city||'vancouver'));
 const vanView = () => st.view==='vancouver';
@@ -249,17 +250,17 @@ function render(){
   const top=cur.slice(0,st.shown);
   // KPIs
   const med=a=>{if(!a.length)return null;const s=[...a].sort((x,y)=>x-y);return s[Math.floor(s.length/2)];};
-  const t100=cur.slice(0,100);
+  const t100=cur.slice(0,TOPN);
   const listedN=t100.filter(r=>r.listed).length;
   const vr=viewRows();
   const byCity = isRegion(st.view) ? viewCities().map(c=>c.label.replace('North Vancouver','N. Van')+' '+int(t100.filter(r=>(r.city||'vancouver')===c.code).length)).join(' · ') : null;
   $('#kpis').innerHTML = [
     ['Sites passing filters', int(cur.length), `of ${int(vr.length)} with a non-negative margin`],
-    ['Median profit, top 100', money(med(t100.map(r=>r.profit))), vanView()? 'at assessed value ×'+DATA.assumptions.market_over_assessed : (isRegion(st.view)? 'assessed or modelled lot value by city' : (CITY[st.view]&&CITY[st.view].grade_land==='A'? 'at assessed value ×'+DATA.assumptions.market_over_assessed : 'at modelled lot value (HPI × lot size)'))],
-    ['Median margin, top 100', pct(med(t100.map(r=>r.margin))), `target ≥ ${pct(DATA.assumptions.target_margin)} on cost`],
-    [vanView()? 'Median assessed, top 100' : 'Median acquisition, top 100', money(med(t100.map(r=>r.assessed))), vanView()||(CITY[st.view]&&CITY[st.view].grade_land==='A')? 'land + improvements, 2026 roll' : 'lot value modelled from MLS HPI benchmark'],
-    isRegion(st.view) ? ['Top 100 by city', int(t100.length), byCity] :
-    ['Listed for sale', int(cur.filter(r=>r.listed).length), listedN? int(listedN)+' in this top 100 · REW.ca, '+DATA.generated : (vanView()? 'none matched in this view' : 'listings only matched for Vancouver')],
+    ['Median profit, top '+TOPN, money(med(t100.map(r=>r.profit))), vanView()? 'at assessed value ×'+DATA.assumptions.market_over_assessed : (isRegion(st.view)? 'assessed or modelled lot value by city' : (CITY[st.view]&&CITY[st.view].grade_land==='A'? 'at assessed value ×'+DATA.assumptions.market_over_assessed : 'at modelled lot value (HPI × lot size)'))],
+    ['Median margin, top '+TOPN, pct(med(t100.map(r=>r.margin))), `target ≥ ${pct(DATA.assumptions.target_margin)} on cost`],
+    [vanView()? 'Median assessed, top '+TOPN : 'Median acquisition, top '+TOPN, money(med(t100.map(r=>r.assessed))), vanView()||(CITY[st.view]&&CITY[st.view].grade_land==='A')? 'land + improvements, 2026 roll' : 'lot value modelled from MLS HPI benchmark'],
+    isRegion(st.view) ? ['Top '+TOPN+' by city', int(t100.length), byCity] :
+    ['Listed for sale', int(cur.filter(r=>r.listed).length), listedN? int(listedN)+' in this top '+TOPN+' · REW.ca, '+DATA.generated : (vanView()? 'none matched in this view' : 'listings only matched for Vancouver')],
   ].map(([l,v,s])=>`<div class="kpi"><div class="eyebrow">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
   // table
   const tb=$('#tbl tbody'); tb.innerHTML='';
@@ -400,17 +401,17 @@ ${multi?`<p><strong>Other municipalities (${CITIES.filter(c=>c.code!=='vancouver
 
 // ---------- events
 const on=(sel,ev,fn)=>$(sel).addEventListener(ev,fn);
-on('#f-view','change',e=>{st.view=e.target.value;st.shown=100;st.sel=null;$('#detail').hidden=true;fillAreas();render();});
-on('#f-q','input',e=>{st.q=e.target.value;st.shown=100;render();});
-on('#f-budget','change',e=>{st.budget=e.target.value;st.shown=100;render();});
-on('#f-area','change',e=>{st.area=e.target.value;st.shown=100;render();});
+on('#f-view','change',e=>{st.view=e.target.value;st.shown=TOPN;st.sel=null;$('#detail').hidden=true;fillAreas();render();});
+on('#f-q','input',e=>{st.q=e.target.value;st.shown=TOPN;render();});
+on('#f-budget','change',e=>{st.budget=e.target.value;st.shown=TOPN;render();});
+on('#f-area','change',e=>{st.area=e.target.value;st.shown=TOPN;render();});
 on('#f-min','input',e=>{st.min=e.target.value;render();}); on('#f-max','input',e=>{st.max=e.target.value;render();});
-on('#f-margin','input',e=>{st.margin=+e.target.value/100;$('#f-margin-v').textContent=e.target.value+'%';st.shown=100;render();});
+on('#f-margin','input',e=>{st.margin=+e.target.value/100;$('#f-margin-v').textContent=e.target.value+'%';st.shown=TOPN;render();});
 $('#f-margin-v').textContent=Math.round(st.margin*100)+'%';
-on('#f-sort','change',e=>{st.sort=e.target.value;st.shown=100;render();});
-document.querySelectorAll('#f-zones .chip[data-z],#f-zones .chip[data-g]').forEach(b=>b.addEventListener('click',()=>{const set=b.dataset.z?st.zones:st.groups, key=b.dataset.z||b.dataset.g; if(set.has(key)) set.delete(key); else set.add(key); b.setAttribute('aria-pressed',set.has(key)); st.shown=100; render();}));
+on('#f-sort','change',e=>{st.sort=e.target.value;st.shown=TOPN;render();});
+document.querySelectorAll('#f-zones .chip[data-z],#f-zones .chip[data-g]').forEach(b=>b.addEventListener('click',()=>{const set=b.dataset.z?st.zones:st.groups, key=b.dataset.z||b.dataset.g; if(set.has(key)) set.delete(key); else set.add(key); b.setAttribute('aria-pressed',set.has(key)); st.shown=TOPN; render();}));
 on('#f-listed','click',e=>{st.listed=!st.listed;e.currentTarget.setAttribute('aria-pressed',st.listed);render();});
-on('#more','click',()=>{st.shown+=100;render();});
+on('#more','click',()=>{st.shown+=TOPN;render();});
 document.querySelectorAll('#tbl th[data-k]').forEach(th=>th.addEventListener('click',()=>{const k=th.dataset.k; if(k==='profit'){st.sort='profit';} else if(k==='margin'){st.sort='margin';} else if(k==='rlv'){st.sort='rlvx';} else return; $('#f-sort').value=st.sort; render();}));
 render();
 })();

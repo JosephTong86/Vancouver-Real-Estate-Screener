@@ -144,7 +144,7 @@ COLS = ["address","postal","area","zone","site_m2","assessed","land","improvemen
         "city","grade","land_grade","fam"]
 
 # ---- Vancouver rows: any site with a non-negative modelled margin, plus every top-100 row
-keep = df[(df["oz_margin"] >= 0) | (df["rank_profit"] <= 100)].copy().sort_values("oz_profit", ascending=False)
+keep = df[(df["oz_margin"] >= 0) | (df["rank_profit"] <= 500)].copy().sort_values("oz_profit", ascending=False)
 rows = [row_from(t, "vancouver") for t in keep.itertuples(index=False)]
 cities = [{"code": "vancouver", "label": "Vancouver", "parcels": int(summary["parcels_total"]), "scored": int(summary["parcels_scored"]),
            "clearing": int(summary["clearing_target"]), "rows": len(rows), "grade_land": "A", "grade_zoning": "A",
@@ -158,7 +158,7 @@ if os.path.exists(metro_path) and os.path.exists(msum_path):
     msum = json.load(open(msum_path))
     for code, cs in msum.items():
         sub = m[m["city"] == code].sort_values("oz_profit", ascending=False)
-        sub = sub[(sub["oz_margin"] >= 0) | (sub["rank_profit"] <= 100)].head(MAX_ROWS_PER_CITY)
+        sub = sub[(sub["oz_margin"] >= 0) | (sub["rank_profit"] <= 500)].head(MAX_ROWS_PER_CITY)
         n0 = len(rows)
         rows += [row_from(t, code) for t in sub.itertuples(index=False)]
         assessed = cs.get("parcels_assessed", 0) > cs["parcels_total"] * 0.5
