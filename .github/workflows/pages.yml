@@ -35,6 +35,12 @@ jobs:
       - name: Score the inner-ring municipalities
         continue-on-error: true
         run: python score_metro.py
+      - name: Vendor Leaflet (inlined into the dashboard so the page has no runtime CDN dependency)
+        continue-on-error: true
+        run: |
+          mkdir -p vendor
+          curl -fsSL -o vendor/leaflet.js https://unpkg.com/leaflet@1.9.4/dist/leaflet.js
+          curl -fsSL -o vendor/leaflet.css https://unpkg.com/leaflet@1.9.4/dist/leaflet.css
       - name: Build the dashboard and municipality comparison
         run: |
           python build_dashboard.py
